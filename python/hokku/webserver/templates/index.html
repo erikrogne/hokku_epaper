@@ -856,6 +856,16 @@
   .img-detail-modal td { padding: 6px 8px; border-bottom: 1px solid var(--bamboo-soft); }
   .img-detail-modal td:first-child { color: var(--stone); width: 40%; font-weight: 500; }
   .img-detail-modal .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .patent-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-left: 6px; padding: 2px 7px; border-radius: 999px;
+    background: var(--indigo-soft); color: var(--indigo);
+    font-size: 0.72em; font-weight: 600; letter-spacing: 0.03em;
+    vertical-align: middle;
+  }
+  .patent-card-name { font-family: var(--font-serif); color: var(--sumi); }
+  .patent-card-file { display: block; margin-top: 2px; color: var(--stone); font-size: 0.76em; word-break: break-all; }
+  .patent-detail-head { margin: 0 0 10px; font-family: var(--font-serif); color: var(--sumi); }
 
   @media (max-width: 600px) {
     .page { padding: 14px 12px; }
@@ -3799,6 +3809,12 @@ function pipelineChip(entry) {
   return ` <span class="next-badge" title="${escapeHtml(title)}">${escapeHtml(text)}</span>`;
 }
 
+function patentChip(entry) {
+  return entry && entry.patent
+    ? ' <span class="patent-badge" title="Structured patent record">Patent</span>'
+    : '';
+}
+
 function renderImageGrid(uploadFiles, serveData, nextImages) {
   lastUploadFiles = uploadFiles;
   lastServeData   = serveData;
@@ -3837,7 +3853,7 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
       ${pendingBadge}
       ${thumbHtml}
       <div class="card-body">
-        <div class="filename">${escapeHtml(fname)}${pipelineChip(entry)}</div>
+        <div class="filename">${entry.patent ? `<span class="patent-card-name">${escapeHtml(entry.patent.simple_name || fname)}</span><span class="patent-card-file">${escapeHtml(fname)}</span>` : escapeHtml(fname)}${patentChip(entry)}${pipelineChip(entry)}</div>
         <div class="card-actions">
           ${rotationHtml}
           <button class="btn btn-secondary btn-small details-btn" data-name="">Details</button>
@@ -3919,9 +3935,10 @@ async function saveImageCollections(fname, host) {
 function showImageDetails(fname) {
   const entry   = (lastUploadFiles || []).find(e => e.name === fname) || {};
   const sd      = (lastServeData   || {})[fname] || {};
+  const patent  = entry.patent || null;
 
   const modal   = document.getElementById('img-detail-modal');
-  document.getElementById('img-detail-title').textContent = fname;
+  document.getElementById('img-detail-title').textContent = patent ? (patent.simple_name || fname) : fname;
 
   const thumb   = document.getElementById('img-detail-thumb');
   const boxContainer = document.getElementById('img-detail-face-boxes');
@@ -3984,7 +4001,21 @@ function showImageDetails(fname) {
     }
   }
 
+  const patentRows = patent ? [
+    ['Invention', escapeHtml(patent.simple_name || '–')],
+    ['Inventor(s)', escapeHtml((patent.inventor_names || []).join(', ') || '–')],
+    ['Patent year', escapeHtml(fmt(patent.patent_year, '–'))],
+    ['Patent number', escapeHtml(patent.patent_number || '–')],
+    ['Description', escapeHtml(patent.description || '–')],
+    ['Category', escapeHtml(patent.category || '–')],
+    ['Verification', escapeHtml(patent.verification_status || '–')],
+    ['Recommended figure', escapeHtml(fmt(patent.recommended_figure, '–'))],
+    ['Recommended page', escapeHtml(fmt(patent.recommended_page, '–'))],
+    ['Iconicity score', escapeHtml(fmt(patent.iconicity_score, '–'))],
+    ['Visual quality', escapeHtml(fmt(patent.visual_quality_score, '–'))],
+  ] : [];
   const rows = [
+    ...patentRows,
     ['Dimensions', dimsCell],
     ['Orientation', orientStr],
     ['Dither time', ditherStr],
@@ -3999,7 +4030,15 @@ function showImageDetails(fname) {
     rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 
   const actions = document.getElementById('img-detail-actions');
-  if (entry.dithered) {
+  if (patent) {
+    const id = encodeURIComponent(patent.id || '');
+    const source = patent.source_url ? `<a class="btn btn-secondary btn-small" href="${escapeHtml(patent.source_url)}" target="_blank" rel="noopener">Open patent source</a>` : '';
+    actions.innerHTML = `${source}
+      <a class="btn btn-secondary btn-small" href="/hokku/api/patent/${id}/original" target="_blank">Original drawing</a>
+      <a class="btn btn-secondary btn-small" href="/hokku/api/patent/${id}/source.pdf" target="_blank">Source PDF</a>
+      <a class="btn btn-secondary btn-small" href="/hokku/api/patent/${id}/display" target="_blank">Preview e-ink render</a>
+      <button class="btn btn-secondary btn-small" type="button" onclick="rerenderPatent('${id}')">Re-render</button>`;
+  } else if (entry.dithered) {
     actions.innerHTML = `<a class="btn btn-secondary btn-small" href="/hokku/api/dithered/${encodeURIComponent(fname)}" target="_blank">View dithered</a>`;
   } else {
     actions.innerHTML = '<span style="color:#92400e;font-size:0.85em">Dithered version not ready yet</span>';
@@ -4023,6 +4062,18 @@ function showImageDetails(fname) {
   closeBtn.addEventListener('click', close);
   modal.addEventListener('click', onBackdrop);
   document.addEventListener('keydown', onKey);
+}
+
+async function rerenderPatent(encodedId) {
+  try {
+    const resp = await fetch('/hokku/api/patent/' + encodedId + '/render', {method: 'POST'});
+    const body = await resp.json();
+    if (!resp.ok) throw new Error(body.error || `HTTP ${resp.status}`);
+    showToast('Patent render refreshed.');
+    await refreshStatus();
+  } catch (e) {
+    showToast('Could not rerender patent: ' + e.message);
+  }
 }
 
 // ── Per-picture conversion override ───────────────────────────────

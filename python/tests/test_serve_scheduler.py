@@ -407,6 +407,7 @@ def test_unknown_screen_defaults_to_landscape(app_config: AppConfig):
     sched = ServeScheduler(mgr)
     cfg = sched.get_screen_config("never-seen")
     assert cfg.orientation == Orientation.LANDSCAPE
+    assert cfg.orientation_override is False
     assert cfg.filter_by_orientation is False
 
 

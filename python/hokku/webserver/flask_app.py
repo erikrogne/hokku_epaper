@@ -72,6 +72,10 @@ from hokku.webserver.image_renderer import (
 )
 from hokku.webserver.mdns import _get_local_ip
 from hokku.webserver.orientation import Orientation
+from hokku.webserver.patent_renderer import (
+    default_patent_orientation,
+    resolve_patent_orientation,
+)
 from hokku.webserver.presets import PRESET_IMAGE_CONFIGS, PRESET_META
 from hokku.webserver.resource_budget import (
     MIN_MEMORY_BUDGET_MB,
@@ -296,6 +300,61 @@ def create_app(
             return sorted(names, key=str.casefold)
         return sorted(state.collections.image_names(collection_id) & names, key=str.casefold)
 
+    def _patent_for_image(name: str):
+        """Resolve the structured patent record behind a normal Hokku image."""
+        try:
+            return state.patents.by_image_name(name)
+        except (AttributeError, KeyError, OSError, ValueError):
+            # A partially imported library must never break the ordinary photo
+            # UI or firmware frame path.
+            logger.debug("Could not resolve patent metadata for %r", name, exc_info=True)
+            return None
+
+    def _patent_payload(record) -> dict | None:
+        if record is None:
+            return None
+        try:
+            payload = record.to_dict()
+        except AttributeError:
+            payload = asdict(record)
+        payload["item_type"] = "patent"
+        return payload
+
+    def _patent_by_id(patent_id: str):
+        try:
+            return state.patents.get(patent_id)
+        except (AttributeError, KeyError, OSError, ValueError):
+            return None
+
+    def _patent_asset_path(record, filename: str | None = None) -> Path | None:
+        """Resolve a patent asset without allowing paths outside its library."""
+        library = Path(state.patents.library_dir).resolve()
+        if filename is None:
+            raw = getattr(record, "local_image_path", None)
+            if not raw:
+                return None
+            candidate = Path(raw)
+            if not candidate.is_absolute():
+                candidate = library / candidate
+        else:
+            candidate = library / "images" / str(record.id) / filename
+        try:
+            resolved = candidate.resolve()
+            resolved.relative_to(library)
+        except (OSError, ValueError):
+            return None
+        return resolved
+
+    def _render_patent(record, screen_model: str, orientation: Orientation):
+        """Render a patent through the shared display pipeline when possible."""
+        if record is None:
+            return None
+        try:
+            return state.patent_renderer.render(record, screen_model, orientation)
+        except (OSError, ValueError, RuntimeError) as exc:
+            logger.warning("Patent render failed for %s: %s", getattr(record, "id", "?"), exc)
+            return None
+
     # ── Firmware-facing ────────────────────────────────────────
 
     @app.route("/hokku/screen/", strict_slashes=False, methods=["GET", "POST"])
@@ -366,6 +425,12 @@ def create_app(
                 screen_log = raw.decode("utf-8", errors="replace")
 
         cfg = scheduler.get_screen_config(screen_name)
+
+        def _orientation_for_record(record):
+            if record is not None and not cfg.orientation_override:
+                return default_patent_orientation(screen_model)
+            return cfg.orientation
+
         collection_id = cfg.active_collection_id or ALL_COLLECTION_ID
         try:
             state.collections.get(collection_id)
@@ -387,13 +452,20 @@ def create_app(
             # image the frame already has; if it is unavailable, fall back to
             # All Photos so a stale/deleted image cannot strand the device.
             current = scheduler.screen_last_served(screen_name)
-            if (
-                current
-                and manager.panel_bytes_for_model_orientation(
-                    current, screen_model, cfg.orientation
+            current_patent = _patent_for_image(current) if current else None
+            current_orientation = _orientation_for_record(current_patent)
+            current_available = (
+                _render_patent(current_patent, screen_model, current_orientation) is not None
+                if current_patent is not None
+                else (
+                    current is not None
+                    and manager.panel_bytes_for_model_orientation(
+                        current, screen_model, current_orientation
+                    )
+                    is not None
                 )
-                is not None
-            ):
+            )
+            if current and current_available:
                 chosen = current
                 preserve_current = True
             else:
@@ -430,7 +502,17 @@ def create_app(
             logger.debug("%s: %s told to retry in %ss", label, screen_name, sleep_seconds)
             return _add_cal_seed(resp)
 
-        binary = manager.panel_bytes_for_model_orientation(chosen, screen_model, cfg.orientation)
+        patent = _patent_for_image(chosen)
+        render_orientation = _orientation_for_record(patent)
+        patent_render = _render_patent(patent, screen_model, render_orientation)
+        fallback_orientation = render_orientation if patent is not None else cfg.orientation
+        binary = (
+            patent_render.panel_bytes
+            if patent_render is not None
+            else manager.panel_bytes_for_model_orientation(
+                chosen, screen_model, fallback_orientation
+            )
+        )
         if binary is None:
             # Cache missing (not yet rendered for this orientation) — tell screen to retry.
             sleep_seconds = _busy_retry_seconds(config)
@@ -629,10 +711,117 @@ def create_app(
 
     @app.route("/hokku/api/dithered/<path:name>")
     def api_dithered(name: str):
-        png = state.manager.preview_png(name)
+        patent = _patent_for_image(name)
+        patent_render = _render_patent(
+            patent,
+            "huessen_epf1301",
+            default_patent_orientation("huessen_epf1301"),
+        )
+        png = (
+            patent_render.preview_bytes
+            if patent_render is not None
+            else state.manager.preview_png(name)
+        )
         if png is None:
             abort(404)
         return _png_response(png)
+
+    # ── API: patent records and assets ─────────────────────────
+
+    @app.route("/hokku/api/patents", methods=["GET"])
+    def api_patents_list():
+        records = state.patents.list()
+        return jsonify({"patents": [_patent_payload(record) for record in records]})
+
+    @app.route("/hokku/api/patent/<string:patent_id>", methods=["GET", "PATCH"])
+    def api_patent_detail(patent_id: str):
+        record = _patent_by_id(patent_id)
+        if record is None:
+            return jsonify({"error": f"patent {patent_id!r} not found"}), 404
+        if request.method == "PATCH":
+            body = request.get_json(silent=True)
+            if not isinstance(body, dict):
+                return jsonify({"error": "expected JSON object"}), 400
+            allowed = {
+                "simple_name",
+                "patent_title",
+                "inventor_names",
+                "patent_year",
+                "patent_date",
+                "description",
+                "category",
+                "recommended_figure",
+                "recommended_page",
+                "source_url",
+                "qr_destination_url",
+                "iconicity_score",
+                "visual_quality_score",
+                "verification_status",
+            }
+            unknown = set(body) - allowed
+            if unknown:
+                return jsonify({"error": f"unknown field(s): {', '.join(sorted(unknown))}"}), 400
+            try:
+                record = state.patents.update_manual(patent_id, body)
+            except (AttributeError, KeyError, TypeError, ValueError) as exc:
+                return jsonify({"error": str(exc)}), 400
+        return jsonify(_patent_payload(record))
+
+    @app.route("/hokku/api/patent/<string:patent_id>/original")
+    def api_patent_original(patent_id: str):
+        record = _patent_by_id(patent_id)
+        path = _patent_asset_path(record) if record is not None else None
+        if path is None or not path.is_file():
+            abort(404)
+        return send_file(path)
+
+    @app.route("/hokku/api/patent/<string:patent_id>/source.pdf")
+    def api_patent_source_pdf(patent_id: str):
+        record = _patent_by_id(patent_id)
+        path = _patent_asset_path(record, "source.pdf") if record is not None else None
+        if path is None or not path.is_file():
+            abort(404)
+        return send_file(path, mimetype="application/pdf", as_attachment=True)
+
+    @app.route("/hokku/api/patent/<string:patent_id>/display")
+    def api_patent_display(patent_id: str):
+        record = _patent_by_id(patent_id)
+        if record is None:
+            abort(404)
+        model = request.args.get("model", "huessen_epf1301")
+        try:
+            orientation = resolve_patent_orientation(model, request.args.get("orientation"))
+        except ValueError:
+            return jsonify({"error": "invalid orientation"}), 400
+        rendered = _render_patent(record, model, orientation)
+        if rendered is None:
+            abort(404)
+        return _png_response(rendered.preview_bytes)
+
+    @app.route("/hokku/api/patent/<string:patent_id>/render", methods=["POST"])
+    def api_patent_render(patent_id: str):
+        record = _patent_by_id(patent_id)
+        if record is None:
+            return jsonify({"error": f"patent {patent_id!r} not found"}), 404
+        body = request.get_json(silent=True) or {}
+        model = body.get("model", "huessen_epf1301")
+        try:
+            orientation = resolve_patent_orientation(model, body.get("orientation"))
+        except ValueError:
+            return jsonify({"error": "invalid orientation"}), 400
+        rendered = _render_patent(record, model, orientation)
+        if rendered is None:
+            return jsonify({"error": "patent render failed"}), 503
+        return jsonify(
+            {
+                "ok": True,
+                "patent_id": patent_id,
+                "cache_key": rendered.cache_key,
+                "cache_hit": rendered.cache_hit,
+                "model": model,
+                "orientation": orientation.value,
+            }
+        )
 
     @app.route("/hokku/api/thumbnail/<path:name>")
     def api_thumbnail(name: str):
@@ -1100,6 +1289,7 @@ def create_app(
                 logger.info("Screen config %r: invalid orientation %r", name, raw)
                 return jsonify({"error": "orientation must be 'landscape' or 'portrait'"}), 400
             updates["orientation"] = Orientation(raw)
+            updates["orientation_override"] = True
 
         if "filter_by_orientation" in body:
             val = body.get("filter_by_orientation")
@@ -1383,8 +1573,11 @@ def create_app(
         failed_files = []
         for r in records:
             obs = classifier.observations_for(r.original_sha1) if r.original_sha1 else None
+            patent = _patent_for_image(r.name)
             entry = {
                 "name": r.name,
+                "item_type": "patent" if patent is not None else "photo",
+                "patent": _patent_payload(patent),
                 "dithered": r.convert_status == ConvertStatus.OK,
                 "status": r.convert_status,
                 "error": r.convert_error,

@@ -21,6 +21,8 @@ from hokku.webserver.image_manager_abstract import AbstractImageManager
 from hokku.webserver.image_manager_multi import MultiThreadedImageManager
 from hokku.webserver.image_manager_single import SingleThreadedImageManager
 from hokku.webserver.mdns import start_mdns, stop_mdns
+from hokku.webserver.patent_renderer import PatentRenderer
+from hokku.webserver.patent_store import PatentStore
 from hokku.webserver.resource_budget import compute_budget
 from hokku.webserver.serve_scheduler import ServeScheduler
 
@@ -28,6 +30,11 @@ if TYPE_CHECKING:
     from hokku.webserver.watcher import Watcher
 
 logger = logging.getLogger(__name__)
+
+
+def patent_library_dir(config: AppConfig) -> Path:
+    """Persistent patent assets live beside the configured cache directory."""
+    return Path(config.cache_dir).resolve().parent / "iconic-patents"
 
 
 def build_manager(
@@ -86,6 +93,11 @@ class AppState:
         # The scheduler owns the store so collection membership and rotation
         # always read the same metadata snapshot. Expose it here for routes.
         self.collections = scheduler.collection_store
+        self.patents = PatentStore(patent_library_dir(config))
+        self.patent_renderer = PatentRenderer(
+            library_dir=self.patents.library_dir,
+            image_config=config.image_config_bw,
+        )
         self.watcher = watcher
         self._zc = zc  # live Zeroconf instance (None if mDNS disabled)
         # Screen-flashing job manager. Independent of config, so it is created
@@ -122,6 +134,11 @@ class AppState:
         new_manager = build_manager(new_config, new_classifier)
         new_collections = CollectionStore(new_config.cache_dir)
         new_scheduler = ServeScheduler(new_manager, new_collections)
+        new_patents = PatentStore(patent_library_dir(new_config))
+        new_patent_renderer = PatentRenderer(
+            library_dir=new_patents.library_dir,
+            image_config=new_config.image_config_bw,
+        )
 
         with self._lock:
             self.config = new_config
@@ -130,6 +147,8 @@ class AppState:
             self.manager = new_manager
             self.scheduler = new_scheduler
             self.collections = new_collections
+            self.patents = new_patents
+            self.patent_renderer = new_patent_renderer
 
         # Retire, don't shut down: new_manager has already read the image DB, so
         # a parting flush from the old one would revert it. retire() stops the

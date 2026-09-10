@@ -92,6 +92,20 @@ class CollectionStore:
         with self._lock:
             return self._require(collection_id)
 
+    def find_by_name(self, name: str) -> Collection | None:
+        """Return a real collection with this name, case-insensitively."""
+        clean_name = name.strip() if isinstance(name, str) else ""
+        with self._lock:
+            for collection in self._collections.values():
+                if collection.name.casefold() == clean_name.casefold():
+                    return collection
+        return None
+
+    def ensure(self, name: str, description: str = "") -> Collection:
+        """Return a named collection, creating it once when absent."""
+        existing = self.find_by_name(name)
+        return existing if existing is not None else self.create(name, description)
+
     def contains(self, collection_id: str, image_name: str) -> bool:
         with self._lock:
             self._require(collection_id)
