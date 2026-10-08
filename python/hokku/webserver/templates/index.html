@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hokku - Image Server</title>
+<meta name="theme-color" content="#EEEADF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hokku">
+<link rel="manifest" href="/hokku/static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/hokku/static/icon-192.png">
 <link rel="stylesheet" href="/hokku/static/fonts/fonts.css">
 <style>
   /* ─────────────────────────────────────────────────────────────
@@ -956,6 +961,7 @@
   }
   .flash-f7-steps li { margin: 3px 0; }
 </style>
+<link rel="stylesheet" href="/hokku/static/mobile.css">
 </head>
 <body>
 
@@ -981,11 +987,25 @@
   </symbol>
 </svg>
 
+<a class="skip-link" href="#sec-images">Skip to photos</a>
 <header class="site-header">
   <div id="header-strip"></div>
 </header>
 
+<nav class="section-nav" aria-label="Hokku sections"><div class="nav-inner">
+  <a href="#sec-images">Photos</a>
+  <a href="#sec-screens">Frames</a>
+  <a href="#upload-zone">Upload</a>
+  <button type="button" onclick="goToAdmin()">Admin</button>
+  <button type="button" id="install-help-toggle" aria-expanded="false" aria-controls="install-help">Install</button>
+</div></nav>
 <main class="page">
+<div id="connection-status" class="connection-status" role="status" aria-live="polite" data-state="loading">
+  <p id="connection-message">Connecting to Hokku…</p>
+  <button type="button" id="connection-retry" class="btn btn-secondary" onclick="retryConnection()" hidden>Try again</button>
+</div>
+<div id="install-help" class="pwa-message" hidden><p id="install-context"></p></div>
+<div id="app-update" class="pwa-message" role="status" hidden><p>An app update is ready. Finish your work, then close all Hokku tabs and reopen to use it.</p></div>
 
 <!-- Debug-mode banner (shown only when debug_fast_refresh is on) -->
 <div id="debug-active-banner" class="debug-active-banner" style="display:none">
@@ -1020,8 +1040,8 @@
       <button type="button" class="btn btn-secondary btn-small" onclick="toggleCollectionManager(false)">Close</button>
     </div>
     <div class="config-row" style="margin:0 0 10px;">
-      <input type="text" id="new-collection-name" placeholder="New collection name" maxlength="120" style="flex:1;min-width:160px;">
-      <input type="text" id="new-collection-description" placeholder="Description (optional)" maxlength="500" style="flex:2;min-width:180px;">
+      <input type="text" aria-label="New collection name" id="new-collection-name" placeholder="New collection name" maxlength="120" style="flex:1;min-width:160px;">
+      <input type="text" aria-label="Collection description (optional)" id="new-collection-description" placeholder="Description (optional)" maxlength="500" style="flex:2;min-width:180px;">
       <button type="button" class="btn btn-primary btn-small" onclick="createCollection()">Create</button>
     </div>
     <div id="collection-list"></div>
@@ -1035,7 +1055,7 @@
   </div>
 
   <div class="upload-progress" id="upload-progress"></div>
-  <div class="image-grid" id="image-grid"></div>
+  <div class="image-grid" id="image-grid" aria-busy="true"><p class="gallery-empty">Loading photos…</p></div>
 </div>
 
 <div class="failed-section" id="failed-section" style="display:none;">
@@ -1051,11 +1071,11 @@
   </div>
 </div>
 
-<div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" style="margin-top:12px;">
-  <div class="upload-hint">Drag &amp; drop images here, or click to choose files</div>
-  <div class="upload-sub">JPG, PNG, HEIC, WebP, AVIF, TIFF, BMP, GIF</div>
-  <input type="file" id="file-input" multiple accept="image/*,.heic,.heif,.avif,.tiff,.svg">
-</div>
+<button type="button" class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" style="margin-top:12px;">
+  <span class="upload-hint">Choose photos, or drag &amp; drop here</span>
+  <span class="upload-sub">JPG, PNG, HEIC, WebP, AVIF, TIFF, BMP, GIF</span>
+</button>
+<input type="file" id="file-input" hidden multiple accept="image/*,.heic,.heif,.avif,.tiff,.svg">
 
 </section><!-- /sec-images -->
 
@@ -1071,10 +1091,10 @@
 
 <!-- Admin section (Flash + Configuration — not needed during normal use) -->
 <div id="sec-admin" class="admin-section">
-<div class="admin-toggle" id="admin-toggle" onclick="toggleAdmin()">
-  <span class="toggle-arrow">▶</span>
-  <h2>Admin</h2>
-</div>
+<button type="button" class="admin-toggle" id="admin-toggle" onclick="toggleAdmin()" aria-expanded="false" aria-controls="admin-body">
+  <span class="toggle-arrow" aria-hidden="true">▶</span>
+  <span class="admin-heading">Admin</span>
+</button>
 <div class="admin-body" id="admin-body">
 
 <!-- Flash a screen -->
@@ -1416,7 +1436,7 @@
 
 <div class="drag-overlay" id="drag-overlay"><div class="drag-msg">Drop images to upload</div></div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- Per-image details modal -->
 <div class="modal-backdrop" id="img-detail-modal">
@@ -1495,7 +1515,12 @@
   </div>
 </div>
 
+<script src="/hokku/static/mobile.js"></script>
 <script>
+let configLoaded = false;
+let configLoadPending = false;
+let statusRefreshPending = false;
+let lastStatusAt = null;
 let currentConfig = {};
 let refreshTimes = [];
 
@@ -1505,9 +1530,15 @@ function toggleAdmin() {
   const body   = document.getElementById('admin-body');
   const open   = body.classList.toggle('open');
   toggle.classList.toggle('open', open);
+  toggle.setAttribute('aria-expanded', String(open));
   // Load the firmware library the first time Admin is expanded (it's hidden
   // during normal use, so there's no reason to fetch it on every page load).
   if (open && !firmwareLibraryLoaded) loadFirmwareLibrary();
+}
+
+function goToAdmin() {
+  if (!document.getElementById('admin-body').classList.contains('open')) toggleAdmin();
+  document.getElementById('sec-admin').scrollIntoView();
 }
 
 // ── Firmware library ────────────────────────────────────────────
@@ -2407,7 +2438,7 @@ function updatePreviewImageOptions(uploadList) {
   // so rebuilding the option list would throw that pin away.
   ['default', 'bw', 'face'].forEach(panelId => {
     const sel = document.getElementById(_pfx(panelId) + '-preview-image');
-    if (!sel) return;
+    if (!sel || document.activeElement === sel) return;
     const current = sel.value;
     if (!available.length) {
       sel.innerHTML = '<option value="">(upload an image first)</option>';
@@ -2417,7 +2448,7 @@ function updatePreviewImageOptions(uploadList) {
     const newKey = available.join('|');
     if (sel.dataset.key === newKey) return;
     sel.dataset.key = newKey;
-    sel.innerHTML = available.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.innerHTML = available.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     if (available.includes(current)) sel.value = current;
   });
 }
@@ -2940,6 +2971,7 @@ function removeTime(idx) {
 }
 
 async function saveConfig() {
+  if (!configLoaded) { showToast('Wait for configuration to load, then try again.'); return; }
   if (document.getElementById('mdns-enabled').checked &&
       !document.getElementById('mdns-hostname').value.trim()) {
     showToast('mDNS hostname cannot be empty — enter a name or uncheck mDNS');
@@ -3124,6 +3156,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     return (m && bundledFirmwareVersions && bundledFirmwareVersions[m]) || null;
   };
   const container = document.getElementById('screens-container');
+  if (container.contains(document.activeElement) || document.querySelector('.modal-backdrop.show')) return;
   const names = Object.keys(screens || {});
   const screenLabel = n => (screens[n] && screens[n].display_name) || n;
   if (names.length === 0) {
@@ -3725,7 +3758,8 @@ function collectionOptions(selectedId, includeAll = true) {
 function refreshCollectionControls() {
   const filter = document.getElementById('collection-filter');
   const bulk = document.getElementById('bulk-collection-select');
-  if (filter) {
+  const selectedBulk = new Set(Array.from(bulk?.selectedOptions || []).map(option => option.value));
+  if (filter && document.activeElement !== filter) {
     if (!collectionById(currentCollectionFilter)) {
       currentCollectionFilter = 'all';
       storeCollectionFilter(currentCollectionFilter);
@@ -3733,7 +3767,14 @@ function refreshCollectionControls() {
     filter.innerHTML = collectionOptions(currentCollectionFilter, true);
     filter.value = currentCollectionFilter;
   }
-  if (bulk) bulk.innerHTML = '<option value="">Choose collection…</option>' + collectionOptions('', false);
+  if (bulk && document.activeElement !== bulk) {
+    const options = '<option value="">Choose collection…</option>' + collectionOptions('', false);
+    if (bulk.dataset.options !== options) {
+      bulk.innerHTML = options;
+      bulk.dataset.options = options;
+      Array.from(bulk.options).forEach(option => { option.selected = selectedBulk.has(option.value); });
+    }
+  }
   renderCollectionManager();
   renderCollectionWarning();
 }
@@ -3741,6 +3782,7 @@ function refreshCollectionControls() {
 function renderCollectionManager() {
   const list = document.getElementById('collection-list');
   if (!list) return;
+  if (list.contains(document.activeElement)) return;
   list.innerHTML = (lastCollections || []).map(c => {
     const actions = c.id === 'all' ? '<span class="collection-meta">Built in</span>' :
       `<div class="collection-actions"><button type="button" class="btn btn-secondary btn-small" onclick="renameCollection('${escapeHtml(c.id)}')">Rename</button><button type="button" class="btn btn-secondary btn-small" style="color:var(--vermilion)" onclick="deleteCollection('${escapeHtml(c.id)}')">Delete</button></div>`;
@@ -3835,8 +3877,9 @@ function setCollectionFilter(id) {
   currentCollectionFilter = id || 'all';
   storeCollectionFilter(currentCollectionFilter);
   imageGridVisibleCount = IMAGE_GRID_PAGE_SIZE;
+  document.getElementById('image-grid').dataset.signature = '';
   renderCollectionWarning();
-  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages);
+  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages, true);
 }
 
 function selectedImageNames() {
@@ -3894,11 +3937,16 @@ function patentChip(entry) {
     : '';
 }
 
-function renderImageGrid(uploadFiles, serveData, nextImages) {
+function renderImageGrid(uploadFiles, serveData, nextImages, force = false) {
   lastUploadFiles = uploadFiles;
   lastServeData   = serveData;
   lastNextImages  = nextImages || {};
   const grid = document.getElementById('image-grid');
+  grid.setAttribute('aria-busy', 'false');
+  const signature = JSON.stringify([uploadFiles, serveData, nextImages, currentCollectionFilter, imageGridVisibleCount]);
+  if (!force && (grid.dataset.signature === signature || grid.contains(document.activeElement) || document.querySelector('.modal-backdrop.show'))) return;
+  const selected = new Set(selectedImageNames());
+  grid.dataset.signature = signature;
   grid.innerHTML = '';
   const visibleEntries = uploadFiles.filter(entry => {
     // Failed images are shown only in the "Failed conversions" list, not the grid.
@@ -3923,16 +3971,15 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
     card.className = 'image-card' + (dithered ? '' : ' pending');
     const pendingBadge = dithered ? '' :
       '<div class="pending-badge" title="Dithered version for the e-ink display is still being generated">Dithering…</div>';
-    const thumbHtml = `<img src="/hokku/api/thumbnail/${encodeURIComponent(fname)}" alt="${escapeHtml(fname)}"
-         style="cursor:pointer" title="Click to view original">`;
+    const thumbHtml = `<a class="original-link" href="/hokku/api/original/${encodeURIComponent(fname)}" target="_blank" rel="noopener" aria-label="View original ${escapeHtml(fname)}"><img src="/hokku/api/thumbnail/${encodeURIComponent(fname)}" alt="${escapeHtml(fname)}" loading="lazy"></a>`;
     // Rotation action: orientation-aware "next" badges (non-interactive) when this
     // image is queued next for any orientation; otherwise an active "Show Next" button.
     const rotationHtml = !dithered ? '' : isNext
       ? nextLabels.map(l => `<span class="next-badge">${escapeHtml(l)}</span>`).join(' ')
       : '<button class="btn btn-secondary btn-small shownext-btn" data-name="">Show Next</button>';
     card.innerHTML = `
-      <input type="checkbox" class="image-select" data-name="" aria-label="Select ${escapeHtml(fname)}">
-      <button class="delete-btn" data-name="" title="Delete this image">&#x1F5D1;</button>
+      <label class="image-select-target"><input type="checkbox" class="image-select" data-name="" aria-label="Select ${escapeHtml(fname)}"></label>
+      <button class="delete-btn" data-name="" title="Delete this image" aria-label="Delete ${escapeHtml(fname)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
       ${pendingBadge}
       ${thumbHtml}
       <div class="card-body">
@@ -3944,8 +3991,6 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
       </div>
     `;
     // Wire click handlers via data attributes to avoid injection from filenames.
-    const img = card.querySelector('img');
-    img.addEventListener('click', () => window.open('/hokku/api/original/' + encodeURIComponent(fname)));
     const delBtn = card.querySelector('.delete-btn');
     delBtn.dataset.name = fname;
     delBtn.addEventListener('click', () => deleteImage(fname));
@@ -3959,9 +4004,18 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
     }
     const select = card.querySelector('.image-select');
     select.dataset.name = fname;
+    select.checked = selected.has(fname);
     select.addEventListener('change', updateSelectionActions);
     grid.appendChild(card);
   });
+  if (!visibleEntries.length) {
+    const empty = document.createElement('p');
+    empty.className = 'gallery-empty';
+    empty.textContent = currentCollectionFilter === 'all'
+      ? 'No photos yet. Choose photos below to start your library.'
+      : 'No photos in this collection. Add photos below or choose another collection.';
+    grid.appendChild(empty);
+  }
   if (visibleEntries.length > entriesToRender.length) {
     const pagination = document.createElement('div');
     pagination.className = 'image-grid-pagination';
@@ -3982,8 +4036,9 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
 
 function showMoreImages() {
   imageGridVisibleCount += IMAGE_GRID_PAGE_SIZE;
-  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages);
-  document.getElementById('image-grid-more')?.focus();
+  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages, true);
+  const more = document.getElementById('image-grid-more');
+  (more || document.querySelector('.image-grid .image-card:last-of-type .details-btn'))?.focus();
 }
 
 function renderImageCollectionEditor(fname, entry) {
@@ -4521,8 +4576,13 @@ async function runImageCompareGrid() {
 //                     mid-typing.
 
 async function loadConfig() {
+  if (configLoadPending || configLoaded) return;
+  configLoadPending = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const resp = await fetch('/hokku/api/config');
+    const resp = await fetch('/hokku/api/config', {cache: 'no-store', signal: controller.signal});
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const cfg = data.config;
 
@@ -4644,9 +4704,13 @@ async function loadConfig() {
     if (installerRow) {
       installerRow.style.display = data.installer_available ? '' : 'none';
     }
+    configLoaded = true;
   } catch (e) {
     console.error('Config load failed:', e);
-    showToast('Failed to load configuration');
+  } finally {
+    configLoadPending = false;
+    clearTimeout(timeout);
+    updateConnectionState();
   }
 }
 
@@ -4672,8 +4736,13 @@ async function resetToInstaller() {
 }
 
 async function refreshStatus() {
+  if (statusRefreshPending) return;
+  statusRefreshPending = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const resp = await fetch('/hokku/api/status');
+    const resp = await fetch('/hokku/api/status', {cache: 'no-store', signal: controller.signal});
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
     document.getElementById('server-time').textContent = data.server_time || '';
@@ -4745,9 +4814,36 @@ async function refreshStatus() {
     renderImageGrid(uploadList, data.serve_data, data.next_images || {});
     renderFailedList(data.failed_files || []);
     updatePreviewImageOptions(uploadList);
+    lastStatusAt = new Date();
+    updateConnectionState();
   } catch (e) {
     console.error('Status refresh failed:', e);
+    updateConnectionState(true);
+    document.getElementById('image-grid').setAttribute('aria-busy', 'false');
+    if (!lastStatusAt) document.getElementById('image-grid').innerHTML = '<p class="gallery-empty">Photos will appear when the server reconnects.</p>';
+  } finally {
+    clearTimeout(timeout);
+    statusRefreshPending = false;
   }
+}
+
+function updateConnectionState(failed = false) {
+  const status = document.getElementById('connection-status');
+  const problem = failed || !navigator.onLine || (!configLoaded && !configLoadPending);
+  status.hidden = !problem && !!lastStatusAt;
+  status.dataset.state = problem ? 'error' : 'loading';
+  document.getElementById('connection-retry').hidden = !problem;
+  document.getElementById('connection-message').textContent = problem
+    ? (!navigator.onLine ? 'You are offline. Reconnect to use Hokku. No commands are queued.'
+      : (!configLoaded ? 'Configuration could not load. Try again before changing settings.'
+        : `Hokku is unreachable. Showing data from ${lastStatusAt?.toLocaleTimeString() || 'the last successful connection'}.`))
+    : 'Connecting to Hokku…';
+}
+
+async function retryConnection() {
+  const retry = document.getElementById('connection-retry');
+  retry.disabled = true;
+  try { await loadConfig(); await refreshStatus(); } finally { retry.disabled = false; }
 }
 
 function showDebugInfo() {
@@ -4766,6 +4862,7 @@ function showDebugInfo() {
 function showConfirm({title, message, okLabel, okClass}) {
   return new Promise(resolve => {
     const modal = document.getElementById('confirm-modal');
+    modal._returnFocus = document.activeElement;
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').textContent = message;
     const okBtn = document.getElementById('confirm-ok');
@@ -4789,14 +4886,14 @@ function showConfirm({title, message, okLabel, okClass}) {
     const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
     const onKey = (e) => {
       if (e.key === 'Escape') cleanup(false);
-      else if (e.key === 'Enter') cleanup(true);
+      // Native button activation handles Enter on the focused action.
     };
 
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
     modal.addEventListener('click', onBackdrop);
     document.addEventListener('keydown', onKey);
-    okBtn.focus();
+    cancelBtn.focus();
   });
 }
 
@@ -4990,7 +5087,10 @@ function onMdnsToggle() {
 
 // Initial load: fetch config once, then start polling volatile status only.
 loadConfig().then(refreshStatus);
-setInterval(refreshStatus, 5000);
+setInterval(() => { if (!document.hidden && navigator.onLine) refreshStatus(); }, 5000);
+window.addEventListener('online', retryConnection);
+window.addEventListener('offline', () => updateConnectionState(true));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) retryConnection(); });
 </script>
 </body>
 </html>

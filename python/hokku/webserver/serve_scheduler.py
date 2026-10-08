@@ -682,9 +682,7 @@ class ServeScheduler:
 
     # ── Per-screen config ─────────────────────────────────────────
 
-    def get_screen_config(
-        self, name: str | None = None, mac: str | None = None
-    ) -> ScreenConfig:
+    def get_screen_config(self, name: str | None = None, mac: str | None = None) -> ScreenConfig:
         """Return a screen config resolved by MAC or name.
 
         MAC is authoritative when present, so a device's config remains attached

@@ -955,14 +955,10 @@ def test_screen_display_name_patch_validation_and_status(bare_client):
         assert config.display_name == "Living Room"
         assert config.orientation == Orientation.LANDSCAPE
 
-    response = client.patch(
-        "/hokku/api/screens/unnamed/config", json={"display_name": "x" * 64}
-    )
+    response = client.patch("/hokku/api/screens/unnamed/config", json={"display_name": "x" * 64})
     assert response.status_code == 200
 
-    response = client.patch(
-        "/hokku/api/screens/unnamed/config", json={"display_name": "   "}
-    )
+    response = client.patch("/hokku/api/screens/unnamed/config", json={"display_name": "   "})
     assert response.status_code == 200
     assert state.scheduler.get_screen_config("unnamed").display_name == ""
 
@@ -994,9 +990,7 @@ def test_screen_device_name_patch_validation_and_status(bare_client):
         assert config.device_name == "Hallway Frame"
         assert config.orientation == Orientation.LANDSCAPE
 
-    response = client.patch(
-        "/hokku/api/screens/unnamed/config", json={"device_name": "é" * 32}
-    )
+    response = client.patch("/hokku/api/screens/unnamed/config", json={"device_name": "é" * 32})
     assert response.status_code == 200
     assert state.scheduler.get_screen_config("unnamed").device_name == "é" * 32
 
@@ -1004,16 +998,25 @@ def test_screen_device_name_patch_validation_and_status(bare_client):
 def test_screen_config_patches_preserve_display_name(bare_client):
     client, state = bare_client
     collection = state.collections.create("Family")
-    assert client.patch(
-        "/hokku/api/screens/frame/config", json={"display_name": "Hallway"}
-    ).status_code == 200
-    assert client.patch(
-        "/hokku/api/screens/frame/config",
-        json={"orientation": "portrait", "filter_by_orientation": True},
-    ).status_code == 200
-    assert client.patch(
-        "/hokku/api/screens/frame/collection", json={"collection_id": collection.id}
-    ).status_code == 200
+    assert (
+        client.patch(
+            "/hokku/api/screens/frame/config", json={"display_name": "Hallway"}
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            "/hokku/api/screens/frame/config",
+            json={"orientation": "portrait", "filter_by_orientation": True},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            "/hokku/api/screens/frame/collection", json={"collection_id": collection.id}
+        ).status_code
+        == 200
+    )
 
     config = state.scheduler.get_screen_config("frame")
     assert config.display_name == "Hallway"

@@ -715,6 +715,14 @@ def create_app(
         # send_from_directory rejects path-traversal automatically.
         return send_from_directory(static_root, filename)
 
+    @app.route("/hokku/service-worker.js")
+    def service_worker():
+        # Placing the worker here limits its scope to /hokku/. Revalidate it on
+        # every visit so an installed app can discover a new public-asset cache.
+        response = send_from_directory(static_root, "service-worker.js")
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
     # ── API: image data ────────────────────────────────────────
 
     @app.route("/hokku/api/original/<path:name>")
@@ -2027,7 +2035,11 @@ def create_app(
         """
         if not any(_flash_firmware_file(s.SPEC.model_id) for s in esp32_screens()):
             logger.error("Flash scan requested but no effective ESP32 firmware available")
-            return jsonify({"error": "no firmware available on this server; download and select one in Firmware library"}), 503
+            return jsonify(
+                {
+                    "error": "no firmware available on this server; download and select one in Firmware library"
+                }
+            ), 503
         if not state.flash_jobs.begin_scan():
             logger.warning("Flash scan rejected: the serial port is busy")
             return jsonify({"error": "a flash is in progress", "busy": True}), 409
@@ -2118,7 +2130,11 @@ def create_app(
         model_firmware = _flash_firmware_file(screen_model)
         if model_firmware is None:
             logger.error("Flash start requested but no effective firmware for %s", screen_model)
-            return jsonify({"error": f"no firmware for {screen_model} on this server; download and select one in Firmware library"}), 503
+            return jsonify(
+                {
+                    "error": f"no firmware for {screen_model} on this server; download and select one in Firmware library"
+                }
+            ), 503
         if not screen.nvs_tool_available():
             logger.error("Flash start requested but esp-idf-nvs-partition-gen is not installed")
             return jsonify(

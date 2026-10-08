@@ -222,7 +222,9 @@ def test_reload_reconverts_cached_images_when_crop_threshold_changes(
     state = _make_state(old_cfg)
     state.manager.sync()
     state.manager.wait_for_idle()
-    old_slug = state.manager.status("wide.png").slugs["huessen_epf1301.portrait"]
+    old_record = state.manager.status("wide.png")
+    assert old_record is not None
+    old_slug = old_record.slugs["huessen_epf1301.portrait"]
 
     new_cfg = replace(old_cfg, crop_to_fill_threshold=1.0)
     state.reload(new_cfg)

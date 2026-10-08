@@ -67,9 +67,7 @@ def test_collections_filter_rotation_without_resetting_global_stats(
     }
 
 
-def test_invalidate_collection_reconciles_new_ready_image(
-    app_config: AppConfig, make_test_image
-):
+def test_invalidate_collection_reconciles_new_ready_image(app_config: AppConfig, make_test_image):
     """A newly converted collection image must be schedulable immediately."""
     mgr, sched = _setup(app_config, make_test_image, ["existing.png"])
     collection = sched.collection_store.create("Newspaper")
@@ -138,9 +136,12 @@ def test_display_name_persists_and_old_config_defaults_to_blank(
 
     assert ServeScheduler(mgr).get_screen_config("unnamed").display_name == "Living Room"
     assert ScreenConfig.from_dict({"orientation": "landscape"}).display_name == ""
-    assert ScreenConfig.from_dict(
-        {"orientation": "landscape", "screen_label": "Legacy label"}
-    ).display_name == "Legacy label"
+    assert (
+        ScreenConfig.from_dict(
+            {"orientation": "landscape", "screen_label": "Legacy label"}
+        ).display_name
+        == "Legacy label"
+    )
 
 
 def test_device_name_persists_and_old_config_defaults_to_blank(

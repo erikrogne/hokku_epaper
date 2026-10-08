@@ -477,9 +477,7 @@ def test_firmware_config_refused_when_build_slots_exhausted(app_config, tmp_path
             slots.release()
 
 
-def test_firmware_config_overrides_persisted_device_name_by_mac(
-    app_config, tmp_path, monkeypatch
-):
+def test_firmware_config_overrides_persisted_device_name_by_mac(app_config, tmp_path, monkeypatch):
     state = _bare_state(app_config)
     mac = "de:ad:be:ef:00:12"
     state.scheduler.record_screen_call("old-name", "1.1.1.1", 300, None, None, None, mac=mac)

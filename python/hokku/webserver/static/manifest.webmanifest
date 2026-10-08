@@ -1,0 +1,14 @@
+{
+  "id": "/hokku/ui",
+  "name": "Hokku Image Server",
+  "short_name": "Hokku",
+  "start_url": "/hokku/ui",
+  "scope": "/hokku/",
+  "display": "standalone",
+  "background_color": "#EEEADF",
+  "theme_color": "#EEEADF",
+  "icons": [
+    {"src": "/hokku/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/hokku/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+  ]
+}
