@@ -213,6 +213,27 @@ def test_reload_manager_wired_with_new_classifier(app_config: AppConfig, tmp_pat
     assert state.manager._classifier is state.classifier
 
 
+def test_reload_reconverts_cached_images_when_crop_threshold_changes(
+    app_config: AppConfig, tmp_path: Path, make_test_image
+):
+    """A crop setting change must invalidate scheduled-delivery binaries too."""
+    make_test_image(Path(app_config.upload_dir) / "wide.png", size=(1200, 300))
+    old_cfg = replace(app_config, crop_to_fill_threshold=0.0)
+    state = _make_state(old_cfg)
+    state.manager.sync()
+    state.manager.wait_for_idle()
+    old_slug = state.manager.status("wide.png").slugs["huessen_epf1301.portrait"]
+
+    new_cfg = replace(old_cfg, crop_to_fill_threshold=1.0)
+    state.reload(new_cfg)
+    state.manager.wait_for_idle()
+
+    rec = state.manager.status("wide.png")
+    assert rec is not None
+    assert rec.convert_status == "ok"
+    assert rec.slugs["huessen_epf1301.portrait"] != old_slug
+
+
 # ── Watcher unit tests ────────────────────────────────────────────────────────
 
 

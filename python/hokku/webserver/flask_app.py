@@ -283,6 +283,20 @@ def create_app(
         ``state.config`` fresh each request."""
         return FirmwareStore(Path(state.config.firmware_dir))
 
+    def _flash_firmware_file(model_id: str) -> Path | None:
+        """Resolve the firmware image used by USB flashing.
+
+        The web firmware library can contain downloaded images as well as the
+        read-only bundled image.  The flash routes must use the same effective
+        selection as OTA serving; checking only ``merged_firmware_file()``
+        ignores downloaded firmware on development installs.
+        """
+        variant = _firmware_store().effective(model_id)
+        if variant is not None and variant.path is not None:
+            return variant.path
+        screen = esp32_screen(model_id)
+        return screen.merged_firmware_file() if screen is not None else None
+
     def _collection_payload(collection) -> dict:
         records = state.manager.list()
         if collection.id == ALL_COLLECTION_ID:
@@ -424,7 +438,7 @@ def create_app(
             if raw:
                 screen_log = raw.decode("utf-8", errors="replace")
 
-        cfg = scheduler.get_screen_config(screen_name)
+        cfg = scheduler.get_screen_config(screen_name, mac=screen_mac)
 
         def _orientation_for_record(record):
             if record is not None and not cfg.orientation_override:
@@ -638,6 +652,7 @@ def create_app(
             abort(404)
 
         screen_name = request.headers.get("X-Screen-Name")
+        screen_mac = parse_mac_header(request.headers.get("X-Screen-Mac"))
         current = parse_config_state(request.headers.get("X-Config-State"))
         if not screen_name:
             screen_name = (current or {}).get("screen_name") or "unnamed"
@@ -651,7 +666,11 @@ def create_app(
             state.scheduler.record_ota_error(screen_name, msg)
             return make_response(msg, 422)
 
-        url_override = state.scheduler.get_screen_config(screen_name).server_url_override
+        screen_config = state.scheduler.get_screen_config(screen_name, mac=screen_mac)
+        if screen_config.device_name:
+            migrated["screen_name"] = screen_config.device_name
+
+        url_override = screen_config.server_url_override
         if url_override:
             migrated["image_url"] = url_override
             logger.info("Applying server URL override for %s: %s", screen_name, url_override)
@@ -1276,12 +1295,33 @@ def create_app(
 
     @app.route("/hokku/api/screens/<string:name>/config", methods=["PATCH"])
     def api_screen_config(name: str):
-        """Patch per-screen config (orientation, filter, URL, or collection)."""
+        """Patch per-screen config (names, orientation, filter, URL, or collection)."""
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             return jsonify({"error": "expected JSON object"}), 400
         current = state.scheduler.get_screen_config(name)
         updates: dict = {}
+
+        display_name_keys = [key for key in ("display_name", "screen_label") if key in body]
+        if display_name_keys:
+            values = [body[key] for key in display_name_keys]
+            if any(not isinstance(value, str) for value in values):
+                return jsonify({"error": "display_name must be a string"}), 400
+            if len(values) == 2 and values[0] != values[1]:
+                return jsonify({"error": "display_name and screen_label must match"}), 400
+            display_name = values[0].strip()
+            if len(display_name.encode("utf-8")) > 64:
+                return jsonify({"error": "display_name must be at most 64 UTF-8 bytes"}), 400
+            updates["display_name"] = display_name
+
+        if "device_name" in body:
+            device_name = body.get("device_name")
+            if not isinstance(device_name, str):
+                return jsonify({"error": "device_name must be a string"}), 400
+            device_name = device_name.strip()
+            if len(device_name.encode("utf-8")) > 64:
+                return jsonify({"error": "device_name must be at most 64 UTF-8 bytes"}), 400
+            updates["device_name"] = device_name
 
         if "orientation" in body:
             raw = body.get("orientation")
@@ -1650,6 +1690,8 @@ def create_app(
             )
             screen_peek_orientations.add(peek_orientation)
             screens_payload[sname] = {
+                "display_name": scfg.display_name,
+                "device_name": scfg.device_name,
                 "mac": t.mac,
                 "cal_ppm": t.cal_ppm,
                 "cal_mean_ppm": (round(t.cal_mean_ppm, 1) if t.cal_mean_ppm is not None else None),
@@ -1983,9 +2025,9 @@ def create_app(
         identically; only the version/config comparison is model-specific). It
         defaults to the huessen reference model.
         """
-        if not any(s.merged_firmware_file() for s in esp32_screens()):
-            logger.error("Flash scan requested but no bundled ESP32 firmware available")
-            return jsonify({"error": "no bundled firmware available on this server"}), 503
+        if not any(_flash_firmware_file(s.SPEC.model_id) for s in esp32_screens()):
+            logger.error("Flash scan requested but no effective ESP32 firmware available")
+            return jsonify({"error": "no firmware available on this server; download and select one in Firmware library"}), 503
         if not state.flash_jobs.begin_scan():
             logger.warning("Flash scan rejected: the serial port is busy")
             return jsonify({"error": "a flash is in progress", "busy": True}), 409
@@ -2073,10 +2115,10 @@ def create_app(
         if screen is None:
             logger.info("Flash start: unknown ESP32 model %r", screen_model)
             return jsonify({"error": f"unknown ESP32 screen model {screen_model!r}"}), 400
-        model_firmware = screen.merged_firmware_file()
+        model_firmware = _flash_firmware_file(screen_model)
         if model_firmware is None:
-            logger.error("Flash start requested but no bundled firmware for %s", screen_model)
-            return jsonify({"error": f"no bundled firmware for {screen_model} on this server"}), 503
+            logger.error("Flash start requested but no effective firmware for %s", screen_model)
+            return jsonify({"error": f"no firmware for {screen_model} on this server; download and select one in Firmware library"}), 503
         if not screen.nvs_tool_available():
             logger.error("Flash start requested but esp-idf-nvs-partition-gen is not installed")
             return jsonify(

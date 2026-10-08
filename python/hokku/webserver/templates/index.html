@@ -464,7 +464,7 @@
     display: block;
   }
   .image-card .card-body { padding: 10px 14px; }
-  .image-card .filename { font-weight: 600; font-size: 0.9em; margin-bottom: 6px; word-break: break-all; color: var(--sumi); }
+  .image-card .filename { min-width: 0; font-weight: 600; font-size: 0.9em; margin-bottom: 6px; overflow-wrap: anywhere; word-break: break-word; color: var(--sumi); }
   .image-card .delete-btn {
     position: absolute; top: 8px; right: 8px; z-index: 3;
     background: rgba(251, 246, 233, 0.92);
@@ -489,6 +489,7 @@
     font-family: var(--font-serif);
   }
   .screens-table td { padding: 8px 12px; border-bottom: 1px solid var(--bamboo-soft); color: var(--sumi); }
+  .screens-table select { max-width: 100%; min-width: 0; }
   .screens-table tr.overdue td { background: rgba(184, 58, 46, 0.08); }
   .screens-empty { color: var(--stone); font-style: italic; padding: 14px 0; font-size: 0.9em; }
   .screen-warning {
@@ -635,6 +636,8 @@
   .collection-manager-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
   .collection-manager-header h3 { margin:0; }
   .collection-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--bamboo-soft); font-size:0.9em; }
+  .collection-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .collection-row strong { overflow-wrap: anywhere; word-break: break-word; }
   .collection-row:first-child { border-top:none; }
   .collection-row .collection-meta { color:var(--stone); font-size:0.86em; }
   .collection-row .collection-actions { display:flex; gap:6px; flex-shrink:0; }
@@ -652,6 +655,12 @@
   .image-collection-editor.is-saving { opacity: 0.6; }
   .collection-check.is-saving { opacity: 0.55; pointer-events: none; }
   .collection-membership-summary { margin: 0 0 10px; color: var(--stone); font-size: 0.86em; }
+  .image-grid-pagination {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    flex-wrap: wrap; padding: 10px 0 2px; color: var(--stone); font-size: 0.88em;
+  }
+  .image-grid-pagination button { min-height: 40px; }
 
   /* ── Confirmation modal ───────────────────────────────────── */
   .modal-backdrop {
@@ -863,7 +872,7 @@
     font-size: 0.72em; font-weight: 600; letter-spacing: 0.03em;
     vertical-align: middle;
   }
-  .patent-card-name { font-family: var(--font-serif); color: var(--sumi); }
+  .patent-card-name { display: block; font-family: var(--font-serif); color: var(--sumi); overflow-wrap: anywhere; word-break: break-word; }
   .patent-card-file { display: block; margin-top: 2px; color: var(--stone); font-size: 0.76em; word-break: break-all; }
   .patent-detail-head { margin: 0 0 10px; font-family: var(--font-serif); color: var(--sumi); }
 
@@ -875,15 +884,53 @@
     .collection-manager .config-row { align-items: stretch; }
     .collection-manager .config-row input, .collection-manager .config-row button { width: 100%; min-height: 42px; }
     .collection-row { align-items: flex-start; }
+    .collection-row > div:first-child { flex: 1 1 auto; }
     .collection-row .collection-actions { flex-direction: column; }
     .bulk-image-actions { align-items: stretch; }
     .bulk-image-actions strong, .bulk-image-actions select, .bulk-image-actions button { width: 100%; min-height: 42px; }
     .bulk-image-actions select { min-height: 96px; }
     .img-detail-modal { width: calc(100vw - 24px); min-width: 0; padding: 18px; }
     .collection-checks { grid-template-columns: 1fr; }
+    .screen-config-modal .config-row { align-items: stretch; flex-direction: column; gap: 6px; }
+    .screen-config-modal .config-row label:first-child { min-width: 0; }
+    .screen-config-modal .config-row select { width: 100%; min-height: 42px; }
+
+    /* Connected screens become readable cards instead of forcing the whole
+       page to scroll sideways on a phone. */
+    .screens-table { display: block; width: 100%; font-size: 0.86em; }
+    .screens-table tbody { display: block; width: 100%; }
+    .screens-table tr {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px; width: 100%; padding: 10px 0;
+      border-bottom: 1px solid var(--bamboo-soft);
+    }
+    .screens-table th { display: none; }
+    .screens-table td {
+      display: flex; flex-direction: column; align-items: stretch;
+      min-width: 0; padding: 6px 0; border-bottom: none;
+      overflow-wrap: anywhere; word-break: break-word;
+    }
+    .screens-table td::before {
+      display: block; margin-bottom: 2px; color: var(--stone);
+      font-family: var(--font-serif); font-size: 0.88em; font-weight: 600;
+    }
+    .screens-table td:nth-child(1),
+    .screens-table td:nth-child(2),
+    .screens-table td:nth-child(9) { grid-column: 1 / -1; }
+    .screens-table td:nth-child(1)::before { content: 'Name'; }
+    .screens-table td:nth-child(2)::before { content: 'Collection'; }
+    .screens-table td:nth-child(3)::before { content: 'Model'; }
+    .screens-table td:nth-child(4)::before { content: 'IP'; }
+    .screens-table td:nth-child(5)::before { content: 'Battery'; }
+    .screens-table td:nth-child(6)::before { content: 'Last seen'; }
+    .screens-table td:nth-child(7)::before { content: 'Next update'; }
+    .screens-table td:nth-child(8)::before { content: 'Last image'; }
+    .screens-table td:nth-child(9)::before { content: 'Actions'; }
+    .screens-table td:nth-child(2) select { width: 100%; min-height: 42px; }
+    .screens-table td:nth-child(9) > div { flex-wrap: wrap; }
   }
 
-  .image-card .card-body { padding: 10px 12px; }
+  .image-card .card-body { min-width: 0; padding: 10px 12px; }
   .image-card .card-actions {
     display: flex; gap: 6px; align-items: center;
     flex-wrap: wrap; margin-top: 8px;
@@ -3078,6 +3125,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
   };
   const container = document.getElementById('screens-container');
   const names = Object.keys(screens || {});
+  const screenLabel = n => (screens[n] && screens[n].display_name) || n;
   if (names.length === 0) {
     container.innerHTML = '<div class="screens-empty">No screens have connected yet.</div>';
     return;
@@ -3109,7 +3157,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     html += 'Likely causes: battery depleted, WiFi / router outage, or the frame has been unplugged.';
     html += '<ul>';
     overdue.forEach(s => {
-      let line = `<strong>${s.name}</strong> — ${formatMinutesLate(s.late)}`;
+      let line = `<strong>${escapeHtml(screenLabel(s.name))}</strong> — ${formatMinutesLate(s.late)}`;
       if (s.battery_mv != null) {
         const volts = (s.battery_mv/1000).toFixed(2);
         const pctStr = s.battery_percent != null ? ` / ${s.battery_percent}%` : '';
@@ -3126,7 +3174,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     html += `Open a screen's <em>Config</em> to update over-the-air, or use "Flash a screen" via USB.`;
     html += '<ul>';
     outdated.forEach(n => {
-      html += `<li><strong>${n}</strong> — firmware ${screenFwVersion(n)} → <strong>${bundledFor(n)}</strong></li>`;
+      html += `<li><strong>${escapeHtml(screenLabel(n))}</strong> — firmware ${screenFwVersion(n)} → <strong>${bundledFor(n)}</strong></li>`;
     });
     html += '</ul></div>';
   }
@@ -3140,7 +3188,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     html += '<ul>';
     otaErrors.forEach(n => {
       const at = screens[n].ota_error_at ? ` (${screens[n].ota_error_at})` : '';
-      html += `<li><strong>${n}</strong> — ${escapeHtml(screens[n].ota_error)}${at}</li>`;
+      html += `<li><strong>${escapeHtml(screenLabel(n))}</strong> — ${escapeHtml(screens[n].ota_error)}${at}</li>`;
     });
     html += '</ul></div>';
   }
@@ -3148,6 +3196,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
   html += '<table class="screens-table"><tr><th>Name</th><th>Collection</th><th>Model</th><th>IP</th><th>Battery</th><th>Last Seen</th><th>Next Update</th><th>Last Image</th><th></th></tr>';
   names.forEach(name => {
     const s = screens[name];
+    const displayName = screenLabel(name);
     const late = overdueMinutes(s);
     const rowClass = late > 0 ? ' class="overdue"' : '';
     const safeName = name.replace(/'/g, "\\'");
@@ -3155,7 +3204,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     const detailsBtn = s.state
       ? `<button class="btn btn-secondary" onclick="showScreenDetails('${safeName}')">Details</button>`
       : '';
-    const removeBtn = `<button class="btn-icon-danger" onclick="removeScreen('${safeName}')" title="Remove screen record" aria-label="Remove ${name}">
+    const removeBtn = `<button class="btn-icon-danger" onclick="removeScreen('${safeName}')" title="Remove screen record" aria-label="Remove ${escapeHtml(displayName)}">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>`;
     const lastImgThumb = s.last_served
@@ -3168,10 +3217,10 @@ function renderScreens(screens, bundledFirmwareVersions) {
       ? `<span style="font-family:var(--font-mono);font-size:0.85em">${escapeHtml(s.screen_model)}</span>`
       : '<span style="color:var(--bamboo)">—</span>';
     const collectionId = s.active_collection_id || 'all';
-    const collectionCell = `<select class="screen-collection-select" aria-label="Active collection for ${escapeHtml(name)}" onchange="setScreenCollection('${safeName}', this.value)">${collectionOptions(collectionId, true)}</select>` +
+    const collectionCell = `<select class="screen-collection-select" aria-label="Active collection for ${escapeHtml(displayName)}" onchange="setScreenCollection('${safeName}', this.value)">${collectionOptions(collectionId, true)}</select>` +
       (s.active_collection_empty ? '<div class="collection-meta">Empty, keeping current image</div>' : '');
     html += `<tr${rowClass}>
-      <td>${name}${nameBadges}</td>
+      <td><strong>${escapeHtml(displayName)}</strong>${displayName !== name ? `<div class="collection-meta" title="Device identifier: ${escapeHtml(name)}">Device: ${escapeHtml(name)}</div>` : ''}${nameBadges}</td>
       <td>${collectionCell}</td>
       <td>${modelCell}</td>
       <td>${s.ip || '-'}</td>
@@ -3256,11 +3305,30 @@ async function setScreenCollection(name, value) {
       lastScreens[name].active_collection = body.collection;
       lastScreens[name].active_collection_empty = body.empty === true;
     }
-    showToast(`${name} will use ${body.collection.name} on its next refresh.`);
+    showToast(`${(lastScreens[name] && lastScreens[name].display_name) || name} will use ${body.collection.name} on its next refresh.`);
     renderScreens(lastScreens, lastBundledFirmwareVersions);
   } catch (e) {
     alert('Failed to set collection: ' + e.message);
     renderScreens(lastScreens, lastBundledFirmwareVersions);
+  }
+}
+
+async function setScreenDisplayName(name, value) {
+  const displayName = value.trim();
+  try {
+    const r = await fetch(`/hokku/api/screens/${encodeURIComponent(name)}/config`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({display_name: displayName}),
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    if (lastScreens[name]) lastScreens[name].display_name = body.display_name || '';
+    showToast(displayName ? `Frame renamed to ${displayName}.` : 'Frame name cleared.');
+    renderScreens(lastScreens, lastBundledFirmwareVersions);
+    showScreenConfig(name);
+  } catch (e) {
+    alert('Failed to rename frame: ' + e.message);
   }
 }
 
@@ -3360,6 +3428,7 @@ function showScreenConfig(name) {
   const s = lastScreens[name];
   if (!s) return;
   const safeName = name.replace(/'/g, "\\'");
+  const displayName = s.display_name || name;
 
   const orientLandscape = s.orientation === 'landscape' ? 'selected' : '';
   const orientPortrait  = s.orientation === 'portrait'  ? 'selected' : '';
@@ -3367,6 +3436,13 @@ function showScreenConfig(name) {
   const activeCollection = s.active_collection_id || 'all';
 
   let body = `<div class="config-row">
+      <label>Frame name</label>
+      <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+        <input id="screen-display-name-input" type="text" maxlength="64" value="${escapeHtml(s.display_name || '')}" placeholder="${escapeHtml(name)}" style="min-width:0;flex:1;">
+        <button type="button" class="btn btn-secondary btn-small" onclick="setScreenDisplayName('${safeName}', document.getElementById('screen-display-name-input').value)">Save</button>
+      </div>
+    </div>
+    <div class="config-row">
       <label>Orientation</label>
       <select onchange="setScreenOrientation('${safeName}', this.value)">
         <option value="landscape" ${orientLandscape}>Landscape</option>
@@ -3420,7 +3496,7 @@ function showScreenConfig(name) {
     body += `</div>`;
   }
 
-  document.getElementById('screen-config-title').textContent = `Config — ${name}`;
+  document.getElementById('screen-config-title').textContent = `Config — ${displayName}`;
   document.getElementById('screen-config-body').innerHTML = body;
 
   const modal = document.getElementById('screen-config-modal');
@@ -3611,6 +3687,8 @@ let lastServeData = {};
 let lastCollections = [];
 const COLLECTION_FILTER_STORAGE_KEY = 'hokku.collection-filter';
 let lastNextImages = {};
+const IMAGE_GRID_PAGE_SIZE = 10;
+let imageGridVisibleCount = IMAGE_GRID_PAGE_SIZE;
 
 function readStoredCollectionFilter() {
   try {
@@ -3756,6 +3834,7 @@ async function deleteCollection(id) {
 function setCollectionFilter(id) {
   currentCollectionFilter = id || 'all';
   storeCollectionFilter(currentCollectionFilter);
+  imageGridVisibleCount = IMAGE_GRID_PAGE_SIZE;
   renderCollectionWarning();
   renderImageGrid(lastUploadFiles, lastServeData, lastNextImages);
 }
@@ -3821,10 +3900,14 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
   lastNextImages  = nextImages || {};
   const grid = document.getElementById('image-grid');
   grid.innerHTML = '';
-  uploadFiles.forEach(entry => {
+  const visibleEntries = uploadFiles.filter(entry => {
     // Failed images are shown only in the "Failed conversions" list, not the grid.
-    if (entry.status === 'failed') return;
-    if (currentCollectionFilter !== 'all' && !(entry.collection_ids || []).includes(currentCollectionFilter)) return;
+    if (entry.status === 'failed') return false;
+    if (currentCollectionFilter !== 'all' && !(entry.collection_ids || []).includes(currentCollectionFilter)) return false;
+    return true;
+  });
+  const entriesToRender = visibleEntries.slice(0, imageGridVisibleCount);
+  entriesToRender.forEach(entry => {
     const fname    = entry.name;
     const dithered = entry.dithered;
     const imgs = nextImages || {};
@@ -3879,7 +3962,28 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
     select.addEventListener('change', updateSelectionActions);
     grid.appendChild(card);
   });
+  if (visibleEntries.length > entriesToRender.length) {
+    const pagination = document.createElement('div');
+    pagination.className = 'image-grid-pagination';
+    pagination.setAttribute('aria-live', 'polite');
+    const remaining = visibleEntries.length - entriesToRender.length;
+    pagination.innerHTML = `<span>Showing ${entriesToRender.length} of ${visibleEntries.length}</span><button type="button" class="btn btn-secondary" id="image-grid-more">See more photos <span aria-hidden="true">(${Math.min(IMAGE_GRID_PAGE_SIZE, remaining)})</span></button>`;
+    pagination.querySelector('button').addEventListener('click', showMoreImages);
+    grid.appendChild(pagination);
+  } else if (visibleEntries.length > IMAGE_GRID_PAGE_SIZE) {
+    const pagination = document.createElement('div');
+    pagination.className = 'image-grid-pagination';
+    pagination.setAttribute('aria-live', 'polite');
+    pagination.innerHTML = `<span>Showing all ${visibleEntries.length} photos</span>`;
+    grid.appendChild(pagination);
+  }
   updateSelectionActions();
+}
+
+function showMoreImages() {
+  imageGridVisibleCount += IMAGE_GRID_PAGE_SIZE;
+  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages);
+  document.getElementById('image-grid-more')?.focus();
 }
 
 function renderImageCollectionEditor(fname, entry) {

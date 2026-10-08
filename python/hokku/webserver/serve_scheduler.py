@@ -165,6 +165,11 @@ class ServeScheduler:
         self._ota_reflash: set[str] = set()
         self._ota_attempts: dict[str, int] = {}
         self._last_served: tuple[str, float] | None = None
+        # An explicit "Show Next" request is distinct from the cached rotation
+        # pointers. This matters when a screen is scoped to a collection: the
+        # UI action is a direct user command and must not silently fall back to
+        # that collection's independently cached choice.
+        self._forced_next: str | None = None
         self._next_for: dict[Orientation, str | None] = dict.fromkeys(Orientation, None)
         self._next_for_by_collection: dict[str, dict[Orientation, str | None]] = {
             ALL_COLLECTION_ID: self._next_for
@@ -194,6 +199,13 @@ class ServeScheduler:
         with self._lock:
             ready = [r for r in self._manager.list() if r.convert_status == ConvertStatus.OK]
             self._reconcile({r.name for r in ready})
+
+            # A manual Show Next command wins over collection and rotation
+            # caches. It is consumed by mark_served after the binary has been
+            # successfully selected, so a transient cache miss leaves it
+            # queued for the next poll.
+            if self._forced_next in {r.name for r in ready}:
+                return self._forced_next
 
             slots = self._slots_locked(collection_id)
             eligible = self._eligible_ready_locked(ready, collection_id)
@@ -228,6 +240,8 @@ class ServeScheduler:
                 total_show_minutes=cur.total_show_minutes,
             )
             self._last_served = (name, now)
+            if self._forced_next == name:
+                self._forced_next = None
             # Consumed — recompute the next image for all orientations immediately.
             ready = [r for r in self._manager.list() if r.convert_status == ConvertStatus.OK]
             ready_names = {r.name for r in ready}
@@ -257,6 +271,15 @@ class ServeScheduler:
     ) -> str | None:
         """Return the pre-determined next image for the given orientation without consuming it."""
         with self._lock:
+            candidate = self._slots_locked(collection_id).get(orientation)
+            ready = [r for r in self._manager.list() if r.convert_status == ConvertStatus.OK]
+            eligible = self._eligible_ready_locked(ready, collection_id, orientation=orientation)
+            if candidate in {r.name for r in eligible}:
+                return candidate
+            # A file can disappear outside the scheduler (for example when a
+            # user moves it to Trash). Do not expose or retain a stale pointer.
+            self._precompute_all_locked(ready, collection_id)
+            self._save()
             return self._slots_locked(collection_id).get(orientation)
 
     def set_next(self, name: str, collection_id: str = ALL_COLLECTION_ID) -> None:
@@ -274,6 +297,7 @@ class ServeScheduler:
                 collection_id, name
             ):
                 raise ValueError(f"Image {name!r} is not in collection {collection_id!r}")
+            self._forced_next = name
             # Override all orientation slots to the forced image. Orientation
             # filtering still happens when a frame asks for a particular slot.
             for o in Orientation:
@@ -507,6 +531,11 @@ class ServeScheduler:
             if collection_id not in self._next_for_by_collection:
                 return
             ready = [r for r in self._manager.list() if r.convert_status == ConvertStatus.OK]
+            # Collection membership can be changed immediately after an image
+            # finishes conversion, before the normal pick path gets a chance
+            # to reconcile scheduler state.  Reconcile here as well so a new
+            # ready image has ServeStats before precomputation indexes it.
+            self._reconcile({r.name for r in ready})
             self._precompute_all_locked(ready, collection_id)
             self._save()
 
@@ -653,10 +682,16 @@ class ServeScheduler:
 
     # ── Per-screen config ─────────────────────────────────────────
 
-    def get_screen_config(self, name: str) -> ScreenConfig:
-        """Return the full config for a screen (default ScreenConfig if not set)."""
+    def get_screen_config(
+        self, name: str | None = None, mac: str | None = None
+    ) -> ScreenConfig:
+        """Return a screen config resolved by MAC or name.
+
+        MAC is authoritative when present, so a device's config remains attached
+        to its stable scheduler record during a firmware screen-name rename.
+        """
         with self._lock:
-            sid = self._resolve_sid_locked(name, None)
+            sid = self._resolve_sid_locked(name, mac)
             if sid is None:
                 return ScreenConfig()
             return self._screen_configs.get(sid, ScreenConfig())
@@ -819,6 +854,9 @@ class ServeScheduler:
                     value = slots_raw.get(orientation.value)
                     slots[orientation] = value if isinstance(value, str) else None
                 self._next_for_by_collection[collection_id] = slots
+        forced_next = data.get("forced_next")
+        if isinstance(forced_next, str):
+            self._forced_next = forced_next
 
     def _rebuild_indexes_locked(self) -> None:
         """Rebuild name->sid and mac->sid from the loaded records, and set the
@@ -901,6 +939,7 @@ class ServeScheduler:
             "schema": 2,
             "sid_seq": self._sid_seq,
             "next_for": {o.value: self._next_for.get(o) for o in Orientation},
+            "forced_next": self._forced_next,
             "next_for_by_collection": {
                 collection_id: {o.value: slots.get(o) for o in Orientation}
                 for collection_id, slots in self._next_for_by_collection.items()

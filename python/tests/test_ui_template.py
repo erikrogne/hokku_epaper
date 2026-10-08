@@ -100,3 +100,12 @@ def test_collection_context_persists_and_serving_indicator_is_mounted(rendered_u
     """The page exposes the frame-serving status alongside the image stats."""
     assert 'id="stat-serving-collection"' in rendered_ui
     assert "Serving collection:" in rendered_ui
+
+
+def test_mobile_image_grid_has_progressive_reveal_and_screen_card_styles(rendered_ui: str):
+    """Large libraries stay usable on a phone instead of rendering one huge page."""
+    assert "IMAGE_GRID_PAGE_SIZE = 10" in rendered_ui
+    assert "See more photos" in rendered_ui
+    assert "function showMoreImages()" in rendered_ui
+    assert ".screens-table td:nth-child(2) select" in rendered_ui
+    assert "Connected screens become readable cards" in rendered_ui

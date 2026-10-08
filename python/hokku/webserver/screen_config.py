@@ -21,6 +21,9 @@ class ScreenConfig:
     ``filter_by_orientation``: when True, only images whose native
     orientation matches the screen's orientation are eligible for
     serving. Square (NEUTRAL) images are always eligible regardless.
+
+    ``device_name`` is an optional desired firmware ``X-Screen-Name``; the
+    human-facing ``display_name`` remains independent.
     """
 
     orientation: Orientation = Orientation.LANDSCAPE
@@ -28,6 +31,8 @@ class ScreenConfig:
     filter_by_orientation: bool = False
     server_url_override: str = ""
     active_collection_id: str = ALL_COLLECTION_ID
+    display_name: str = ""
+    device_name: str = ""
 
     def __post_init__(self) -> None:
         assert self.orientation in (Orientation.LANDSCAPE, Orientation.PORTRAIT), (
@@ -47,6 +52,8 @@ class ScreenConfig:
             "filter_by_orientation": self.filter_by_orientation,
             "server_url_override": self.server_url_override,
             "active_collection_id": self.active_collection_id,
+            "display_name": self.display_name,
+            "device_name": self.device_name,
         }
 
     @classmethod
@@ -62,4 +69,6 @@ class ScreenConfig:
                 if isinstance(raw_collection_id, str) and raw_collection_id
                 else ALL_COLLECTION_ID
             ),
+            display_name=str(d.get("display_name", d.get("screen_label", ""))),
+            device_name=str(d.get("device_name", "")),
         )

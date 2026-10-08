@@ -132,6 +132,12 @@ class AppState:
         # may take a moment; we don't want to block route handlers for that.
         new_classifier = ImageClassifier(new_config)
         new_manager = build_manager(new_config, new_classifier)
+        # Reconcile cached panel binaries against the new pipeline before the
+        # replacement becomes live.  Without this, a config-only change (for
+        # example crop-to-fill) updates manual previews immediately but leaves
+        # scheduled screen requests serving the previous cached render until a
+        # later watcher tick happens to notice the slug change.
+        new_manager.sync()
         new_collections = CollectionStore(new_config.cache_dir)
         new_scheduler = ServeScheduler(new_manager, new_collections)
         new_patents = PatentStore(patent_library_dir(new_config))
