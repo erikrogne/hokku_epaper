@@ -33,6 +33,7 @@ from hokku.webserver.app_state import AppState, build_manager
 from hokku.webserver.flask_app import OTA_MAX_ATTEMPTS, create_app
 from hokku.webserver.image_classifier import ImageClassifier
 from hokku.webserver.image_manager_single import SingleThreadedImageManager
+from hokku.webserver.screen_config import ScreenConfig
 from hokku.webserver.serve_scheduler import ServeScheduler
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -474,6 +475,38 @@ def test_firmware_config_refused_when_build_slots_exhausted(app_config, tmp_path
     finally:
         for _ in range(held):
             slots.release()
+
+
+def test_firmware_config_overrides_persisted_device_name_by_mac(app_config, tmp_path, monkeypatch):
+    state = _bare_state(app_config)
+    mac = "de:ad:be:ef:00:12"
+    state.scheduler.record_screen_call("old-name", "1.1.1.1", 300, None, None, None, mac=mac)
+    state.scheduler.set_screen_config("old-name", ScreenConfig(device_name="new-name"))
+    captured: dict = {}
+
+    monkeypatch.setattr(huessen_epf1301, "migrate_config", lambda current: dict(current))
+
+    def capture_nvs(config):
+        captured.update(config)
+        return b"nvs"
+
+    monkeypatch.setattr(huessen_epf1301, "build_nvs_binary", capture_nvs)
+    client = _client(state, tmp_path)
+    response = client.get(
+        "/hokku/firmware-config",
+        headers={
+            "X-Screen-Name": "renamed-by-device",
+            "X-Screen-Mac": mac,
+            "X-Screen-Model": "huessen_epf1301",
+            "X-Config-State": json.dumps(
+                {"wifi_ssid1": "Net", "image_url": "http://x/hokku/screen/"}
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.data == b"nvs"
+    assert captured["screen_name"] == "new-name"
 
 
 # ── /hokku/firmware.bin (model-aware OTA image serving) ───────────────────────

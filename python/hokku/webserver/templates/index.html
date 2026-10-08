@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hokku - Image Server</title>
+<meta name="theme-color" content="#EEEADF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hokku">
+<link rel="manifest" href="/hokku/static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/hokku/static/icon-192.png">
 <link rel="stylesheet" href="/hokku/static/fonts/fonts.css">
 <style>
   /* ─────────────────────────────────────────────────────────────
@@ -464,7 +469,7 @@
     display: block;
   }
   .image-card .card-body { padding: 10px 14px; }
-  .image-card .filename { font-weight: 600; font-size: 0.9em; margin-bottom: 6px; word-break: break-all; color: var(--sumi); }
+  .image-card .filename { min-width: 0; font-weight: 600; font-size: 0.9em; margin-bottom: 6px; overflow-wrap: anywhere; word-break: break-word; color: var(--sumi); }
   .image-card .delete-btn {
     position: absolute; top: 8px; right: 8px; z-index: 3;
     background: rgba(251, 246, 233, 0.92);
@@ -489,6 +494,7 @@
     font-family: var(--font-serif);
   }
   .screens-table td { padding: 8px 12px; border-bottom: 1px solid var(--bamboo-soft); color: var(--sumi); }
+  .screens-table select { max-width: 100%; min-width: 0; }
   .screens-table tr.overdue td { background: rgba(184, 58, 46, 0.08); }
   .screens-empty { color: var(--stone); font-style: italic; padding: 14px 0; font-size: 0.9em; }
   .screen-warning {
@@ -635,6 +641,8 @@
   .collection-manager-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
   .collection-manager-header h3 { margin:0; }
   .collection-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--bamboo-soft); font-size:0.9em; }
+  .collection-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .collection-row strong { overflow-wrap: anywhere; word-break: break-word; }
   .collection-row:first-child { border-top:none; }
   .collection-row .collection-meta { color:var(--stone); font-size:0.86em; }
   .collection-row .collection-actions { display:flex; gap:6px; flex-shrink:0; }
@@ -652,6 +660,12 @@
   .image-collection-editor.is-saving { opacity: 0.6; }
   .collection-check.is-saving { opacity: 0.55; pointer-events: none; }
   .collection-membership-summary { margin: 0 0 10px; color: var(--stone); font-size: 0.86em; }
+  .image-grid-pagination {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    flex-wrap: wrap; padding: 10px 0 2px; color: var(--stone); font-size: 0.88em;
+  }
+  .image-grid-pagination button { min-height: 40px; }
 
   /* ── Confirmation modal ───────────────────────────────────── */
   .modal-backdrop {
@@ -856,6 +870,16 @@
   .img-detail-modal td { padding: 6px 8px; border-bottom: 1px solid var(--bamboo-soft); }
   .img-detail-modal td:first-child { color: var(--stone); width: 40%; font-weight: 500; }
   .img-detail-modal .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .patent-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-left: 6px; padding: 2px 7px; border-radius: 999px;
+    background: var(--indigo-soft); color: var(--indigo);
+    font-size: 0.72em; font-weight: 600; letter-spacing: 0.03em;
+    vertical-align: middle;
+  }
+  .patent-card-name { display: block; font-family: var(--font-serif); color: var(--sumi); overflow-wrap: anywhere; word-break: break-word; }
+  .patent-card-file { display: block; margin-top: 2px; color: var(--stone); font-size: 0.76em; word-break: break-all; }
+  .patent-detail-head { margin: 0 0 10px; font-family: var(--font-serif); color: var(--sumi); }
 
   @media (max-width: 600px) {
     .page { padding: 14px 12px; }
@@ -865,15 +889,53 @@
     .collection-manager .config-row { align-items: stretch; }
     .collection-manager .config-row input, .collection-manager .config-row button { width: 100%; min-height: 42px; }
     .collection-row { align-items: flex-start; }
+    .collection-row > div:first-child { flex: 1 1 auto; }
     .collection-row .collection-actions { flex-direction: column; }
     .bulk-image-actions { align-items: stretch; }
     .bulk-image-actions strong, .bulk-image-actions select, .bulk-image-actions button { width: 100%; min-height: 42px; }
     .bulk-image-actions select { min-height: 96px; }
     .img-detail-modal { width: calc(100vw - 24px); min-width: 0; padding: 18px; }
     .collection-checks { grid-template-columns: 1fr; }
+    .screen-config-modal .config-row { align-items: stretch; flex-direction: column; gap: 6px; }
+    .screen-config-modal .config-row label:first-child { min-width: 0; }
+    .screen-config-modal .config-row select { width: 100%; min-height: 42px; }
+
+    /* Connected screens become readable cards instead of forcing the whole
+       page to scroll sideways on a phone. */
+    .screens-table { display: block; width: 100%; font-size: 0.86em; }
+    .screens-table tbody { display: block; width: 100%; }
+    .screens-table tr {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px; width: 100%; padding: 10px 0;
+      border-bottom: 1px solid var(--bamboo-soft);
+    }
+    .screens-table th { display: none; }
+    .screens-table td {
+      display: flex; flex-direction: column; align-items: stretch;
+      min-width: 0; padding: 6px 0; border-bottom: none;
+      overflow-wrap: anywhere; word-break: break-word;
+    }
+    .screens-table td::before {
+      display: block; margin-bottom: 2px; color: var(--stone);
+      font-family: var(--font-serif); font-size: 0.88em; font-weight: 600;
+    }
+    .screens-table td:nth-child(1),
+    .screens-table td:nth-child(2),
+    .screens-table td:nth-child(9) { grid-column: 1 / -1; }
+    .screens-table td:nth-child(1)::before { content: 'Name'; }
+    .screens-table td:nth-child(2)::before { content: 'Collection'; }
+    .screens-table td:nth-child(3)::before { content: 'Model'; }
+    .screens-table td:nth-child(4)::before { content: 'IP'; }
+    .screens-table td:nth-child(5)::before { content: 'Battery'; }
+    .screens-table td:nth-child(6)::before { content: 'Last seen'; }
+    .screens-table td:nth-child(7)::before { content: 'Next update'; }
+    .screens-table td:nth-child(8)::before { content: 'Last image'; }
+    .screens-table td:nth-child(9)::before { content: 'Actions'; }
+    .screens-table td:nth-child(2) select { width: 100%; min-height: 42px; }
+    .screens-table td:nth-child(9) > div { flex-wrap: wrap; }
   }
 
-  .image-card .card-body { padding: 10px 12px; }
+  .image-card .card-body { min-width: 0; padding: 10px 12px; }
   .image-card .card-actions {
     display: flex; gap: 6px; align-items: center;
     flex-wrap: wrap; margin-top: 8px;
@@ -899,6 +961,7 @@
   }
   .flash-f7-steps li { margin: 3px 0; }
 </style>
+<link rel="stylesheet" href="/hokku/static/mobile.css">
 </head>
 <body>
 
@@ -924,11 +987,25 @@
   </symbol>
 </svg>
 
+<a class="skip-link" href="#sec-images">Skip to photos</a>
 <header class="site-header">
   <div id="header-strip"></div>
 </header>
 
+<nav class="section-nav" aria-label="Hokku sections"><div class="nav-inner">
+  <a href="#sec-images">Photos</a>
+  <a href="#sec-screens">Frames</a>
+  <a href="#upload-zone">Upload</a>
+  <button type="button" onclick="goToAdmin()">Admin</button>
+  <button type="button" id="install-help-toggle" aria-expanded="false" aria-controls="install-help">Install</button>
+</div></nav>
 <main class="page">
+<div id="connection-status" class="connection-status" role="status" aria-live="polite" data-state="loading">
+  <p id="connection-message">Connecting to Hokku…</p>
+  <button type="button" id="connection-retry" class="btn btn-secondary" onclick="retryConnection()" hidden>Try again</button>
+</div>
+<div id="install-help" class="pwa-message" hidden><p id="install-context"></p></div>
+<div id="app-update" class="pwa-message" role="status" hidden><p>An app update is ready. Finish your work, then close all Hokku tabs and reopen to use it.</p></div>
 
 <!-- Debug-mode banner (shown only when debug_fast_refresh is on) -->
 <div id="debug-active-banner" class="debug-active-banner" style="display:none">
@@ -963,8 +1040,8 @@
       <button type="button" class="btn btn-secondary btn-small" onclick="toggleCollectionManager(false)">Close</button>
     </div>
     <div class="config-row" style="margin:0 0 10px;">
-      <input type="text" id="new-collection-name" placeholder="New collection name" maxlength="120" style="flex:1;min-width:160px;">
-      <input type="text" id="new-collection-description" placeholder="Description (optional)" maxlength="500" style="flex:2;min-width:180px;">
+      <input type="text" aria-label="New collection name" id="new-collection-name" placeholder="New collection name" maxlength="120" style="flex:1;min-width:160px;">
+      <input type="text" aria-label="Collection description (optional)" id="new-collection-description" placeholder="Description (optional)" maxlength="500" style="flex:2;min-width:180px;">
       <button type="button" class="btn btn-primary btn-small" onclick="createCollection()">Create</button>
     </div>
     <div id="collection-list"></div>
@@ -978,7 +1055,7 @@
   </div>
 
   <div class="upload-progress" id="upload-progress"></div>
-  <div class="image-grid" id="image-grid"></div>
+  <div class="image-grid" id="image-grid" aria-busy="true"><p class="gallery-empty">Loading photos…</p></div>
 </div>
 
 <div class="failed-section" id="failed-section" style="display:none;">
@@ -994,11 +1071,11 @@
   </div>
 </div>
 
-<div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" style="margin-top:12px;">
-  <div class="upload-hint">Drag &amp; drop images here, or click to choose files</div>
-  <div class="upload-sub">JPG, PNG, HEIC, WebP, AVIF, TIFF, BMP, GIF</div>
-  <input type="file" id="file-input" multiple accept="image/*,.heic,.heif,.avif,.tiff,.svg">
-</div>
+<button type="button" class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" style="margin-top:12px;">
+  <span class="upload-hint">Choose photos, or drag &amp; drop here</span>
+  <span class="upload-sub">JPG, PNG, HEIC, WebP, AVIF, TIFF, BMP, GIF</span>
+</button>
+<input type="file" id="file-input" hidden multiple accept="image/*,.heic,.heif,.avif,.tiff,.svg">
 
 </section><!-- /sec-images -->
 
@@ -1014,10 +1091,10 @@
 
 <!-- Admin section (Flash + Configuration — not needed during normal use) -->
 <div id="sec-admin" class="admin-section">
-<div class="admin-toggle" id="admin-toggle" onclick="toggleAdmin()">
-  <span class="toggle-arrow">▶</span>
-  <h2>Admin</h2>
-</div>
+<button type="button" class="admin-toggle" id="admin-toggle" onclick="toggleAdmin()" aria-expanded="false" aria-controls="admin-body">
+  <span class="toggle-arrow" aria-hidden="true">▶</span>
+  <span class="admin-heading">Admin</span>
+</button>
 <div class="admin-body" id="admin-body">
 
 <!-- Flash a screen -->
@@ -1359,7 +1436,7 @@
 
 <div class="drag-overlay" id="drag-overlay"><div class="drag-msg">Drop images to upload</div></div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- Per-image details modal -->
 <div class="modal-backdrop" id="img-detail-modal">
@@ -1438,7 +1515,12 @@
   </div>
 </div>
 
+<script src="/hokku/static/mobile.js"></script>
 <script>
+let configLoaded = false;
+let configLoadPending = false;
+let statusRefreshPending = false;
+let lastStatusAt = null;
 let currentConfig = {};
 let refreshTimes = [];
 
@@ -1448,9 +1530,15 @@ function toggleAdmin() {
   const body   = document.getElementById('admin-body');
   const open   = body.classList.toggle('open');
   toggle.classList.toggle('open', open);
+  toggle.setAttribute('aria-expanded', String(open));
   // Load the firmware library the first time Admin is expanded (it's hidden
   // during normal use, so there's no reason to fetch it on every page load).
   if (open && !firmwareLibraryLoaded) loadFirmwareLibrary();
+}
+
+function goToAdmin() {
+  if (!document.getElementById('admin-body').classList.contains('open')) toggleAdmin();
+  document.getElementById('sec-admin').scrollIntoView();
 }
 
 // ── Firmware library ────────────────────────────────────────────
@@ -2350,7 +2438,7 @@ function updatePreviewImageOptions(uploadList) {
   // so rebuilding the option list would throw that pin away.
   ['default', 'bw', 'face'].forEach(panelId => {
     const sel = document.getElementById(_pfx(panelId) + '-preview-image');
-    if (!sel) return;
+    if (!sel || document.activeElement === sel) return;
     const current = sel.value;
     if (!available.length) {
       sel.innerHTML = '<option value="">(upload an image first)</option>';
@@ -2360,7 +2448,7 @@ function updatePreviewImageOptions(uploadList) {
     const newKey = available.join('|');
     if (sel.dataset.key === newKey) return;
     sel.dataset.key = newKey;
-    sel.innerHTML = available.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.innerHTML = available.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     if (available.includes(current)) sel.value = current;
   });
 }
@@ -2883,6 +2971,7 @@ function removeTime(idx) {
 }
 
 async function saveConfig() {
+  if (!configLoaded) { showToast('Wait for configuration to load, then try again.'); return; }
   if (document.getElementById('mdns-enabled').checked &&
       !document.getElementById('mdns-hostname').value.trim()) {
     showToast('mDNS hostname cannot be empty — enter a name or uncheck mDNS');
@@ -3067,7 +3156,9 @@ function renderScreens(screens, bundledFirmwareVersions) {
     return (m && bundledFirmwareVersions && bundledFirmwareVersions[m]) || null;
   };
   const container = document.getElementById('screens-container');
+  if (container.contains(document.activeElement) || document.querySelector('.modal-backdrop.show')) return;
   const names = Object.keys(screens || {});
+  const screenLabel = n => (screens[n] && screens[n].display_name) || n;
   if (names.length === 0) {
     container.innerHTML = '<div class="screens-empty">No screens have connected yet.</div>';
     return;
@@ -3099,7 +3190,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     html += 'Likely causes: battery depleted, WiFi / router outage, or the frame has been unplugged.';
     html += '<ul>';
     overdue.forEach(s => {
-      let line = `<strong>${s.name}</strong> — ${formatMinutesLate(s.late)}`;
+      let line = `<strong>${escapeHtml(screenLabel(s.name))}</strong> — ${formatMinutesLate(s.late)}`;
       if (s.battery_mv != null) {
         const volts = (s.battery_mv/1000).toFixed(2);
         const pctStr = s.battery_percent != null ? ` / ${s.battery_percent}%` : '';
@@ -3116,7 +3207,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     html += `Open a screen's <em>Config</em> to update over-the-air, or use "Flash a screen" via USB.`;
     html += '<ul>';
     outdated.forEach(n => {
-      html += `<li><strong>${n}</strong> — firmware ${screenFwVersion(n)} → <strong>${bundledFor(n)}</strong></li>`;
+      html += `<li><strong>${escapeHtml(screenLabel(n))}</strong> — firmware ${screenFwVersion(n)} → <strong>${bundledFor(n)}</strong></li>`;
     });
     html += '</ul></div>';
   }
@@ -3130,7 +3221,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     html += '<ul>';
     otaErrors.forEach(n => {
       const at = screens[n].ota_error_at ? ` (${screens[n].ota_error_at})` : '';
-      html += `<li><strong>${n}</strong> — ${escapeHtml(screens[n].ota_error)}${at}</li>`;
+      html += `<li><strong>${escapeHtml(screenLabel(n))}</strong> — ${escapeHtml(screens[n].ota_error)}${at}</li>`;
     });
     html += '</ul></div>';
   }
@@ -3138,6 +3229,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
   html += '<table class="screens-table"><tr><th>Name</th><th>Collection</th><th>Model</th><th>IP</th><th>Battery</th><th>Last Seen</th><th>Next Update</th><th>Last Image</th><th></th></tr>';
   names.forEach(name => {
     const s = screens[name];
+    const displayName = screenLabel(name);
     const late = overdueMinutes(s);
     const rowClass = late > 0 ? ' class="overdue"' : '';
     const safeName = name.replace(/'/g, "\\'");
@@ -3145,7 +3237,7 @@ function renderScreens(screens, bundledFirmwareVersions) {
     const detailsBtn = s.state
       ? `<button class="btn btn-secondary" onclick="showScreenDetails('${safeName}')">Details</button>`
       : '';
-    const removeBtn = `<button class="btn-icon-danger" onclick="removeScreen('${safeName}')" title="Remove screen record" aria-label="Remove ${name}">
+    const removeBtn = `<button class="btn-icon-danger" onclick="removeScreen('${safeName}')" title="Remove screen record" aria-label="Remove ${escapeHtml(displayName)}">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>`;
     const lastImgThumb = s.last_served
@@ -3158,10 +3250,10 @@ function renderScreens(screens, bundledFirmwareVersions) {
       ? `<span style="font-family:var(--font-mono);font-size:0.85em">${escapeHtml(s.screen_model)}</span>`
       : '<span style="color:var(--bamboo)">—</span>';
     const collectionId = s.active_collection_id || 'all';
-    const collectionCell = `<select class="screen-collection-select" aria-label="Active collection for ${escapeHtml(name)}" onchange="setScreenCollection('${safeName}', this.value)">${collectionOptions(collectionId, true)}</select>` +
+    const collectionCell = `<select class="screen-collection-select" aria-label="Active collection for ${escapeHtml(displayName)}" onchange="setScreenCollection('${safeName}', this.value)">${collectionOptions(collectionId, true)}</select>` +
       (s.active_collection_empty ? '<div class="collection-meta">Empty, keeping current image</div>' : '');
     html += `<tr${rowClass}>
-      <td>${name}${nameBadges}</td>
+      <td><strong>${escapeHtml(displayName)}</strong>${displayName !== name ? `<div class="collection-meta" title="Device identifier: ${escapeHtml(name)}">Device: ${escapeHtml(name)}</div>` : ''}${nameBadges}</td>
       <td>${collectionCell}</td>
       <td>${modelCell}</td>
       <td>${s.ip || '-'}</td>
@@ -3246,11 +3338,30 @@ async function setScreenCollection(name, value) {
       lastScreens[name].active_collection = body.collection;
       lastScreens[name].active_collection_empty = body.empty === true;
     }
-    showToast(`${name} will use ${body.collection.name} on its next refresh.`);
+    showToast(`${(lastScreens[name] && lastScreens[name].display_name) || name} will use ${body.collection.name} on its next refresh.`);
     renderScreens(lastScreens, lastBundledFirmwareVersions);
   } catch (e) {
     alert('Failed to set collection: ' + e.message);
     renderScreens(lastScreens, lastBundledFirmwareVersions);
+  }
+}
+
+async function setScreenDisplayName(name, value) {
+  const displayName = value.trim();
+  try {
+    const r = await fetch(`/hokku/api/screens/${encodeURIComponent(name)}/config`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({display_name: displayName}),
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    if (lastScreens[name]) lastScreens[name].display_name = body.display_name || '';
+    showToast(displayName ? `Frame renamed to ${displayName}.` : 'Frame name cleared.');
+    renderScreens(lastScreens, lastBundledFirmwareVersions);
+    showScreenConfig(name);
+  } catch (e) {
+    alert('Failed to rename frame: ' + e.message);
   }
 }
 
@@ -3350,6 +3461,7 @@ function showScreenConfig(name) {
   const s = lastScreens[name];
   if (!s) return;
   const safeName = name.replace(/'/g, "\\'");
+  const displayName = s.display_name || name;
 
   const orientLandscape = s.orientation === 'landscape' ? 'selected' : '';
   const orientPortrait  = s.orientation === 'portrait'  ? 'selected' : '';
@@ -3357,6 +3469,13 @@ function showScreenConfig(name) {
   const activeCollection = s.active_collection_id || 'all';
 
   let body = `<div class="config-row">
+      <label>Frame name</label>
+      <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+        <input id="screen-display-name-input" type="text" maxlength="64" value="${escapeHtml(s.display_name || '')}" placeholder="${escapeHtml(name)}" style="min-width:0;flex:1;">
+        <button type="button" class="btn btn-secondary btn-small" onclick="setScreenDisplayName('${safeName}', document.getElementById('screen-display-name-input').value)">Save</button>
+      </div>
+    </div>
+    <div class="config-row">
       <label>Orientation</label>
       <select onchange="setScreenOrientation('${safeName}', this.value)">
         <option value="landscape" ${orientLandscape}>Landscape</option>
@@ -3410,7 +3529,7 @@ function showScreenConfig(name) {
     body += `</div>`;
   }
 
-  document.getElementById('screen-config-title').textContent = `Config — ${name}`;
+  document.getElementById('screen-config-title').textContent = `Config — ${displayName}`;
   document.getElementById('screen-config-body').innerHTML = body;
 
   const modal = document.getElementById('screen-config-modal');
@@ -3601,6 +3720,8 @@ let lastServeData = {};
 let lastCollections = [];
 const COLLECTION_FILTER_STORAGE_KEY = 'hokku.collection-filter';
 let lastNextImages = {};
+const IMAGE_GRID_PAGE_SIZE = 10;
+let imageGridVisibleCount = IMAGE_GRID_PAGE_SIZE;
 
 function readStoredCollectionFilter() {
   try {
@@ -3637,7 +3758,8 @@ function collectionOptions(selectedId, includeAll = true) {
 function refreshCollectionControls() {
   const filter = document.getElementById('collection-filter');
   const bulk = document.getElementById('bulk-collection-select');
-  if (filter) {
+  const selectedBulk = new Set(Array.from(bulk?.selectedOptions || []).map(option => option.value));
+  if (filter && document.activeElement !== filter) {
     if (!collectionById(currentCollectionFilter)) {
       currentCollectionFilter = 'all';
       storeCollectionFilter(currentCollectionFilter);
@@ -3645,7 +3767,14 @@ function refreshCollectionControls() {
     filter.innerHTML = collectionOptions(currentCollectionFilter, true);
     filter.value = currentCollectionFilter;
   }
-  if (bulk) bulk.innerHTML = '<option value="">Choose collection…</option>' + collectionOptions('', false);
+  if (bulk && document.activeElement !== bulk) {
+    const options = '<option value="">Choose collection…</option>' + collectionOptions('', false);
+    if (bulk.dataset.options !== options) {
+      bulk.innerHTML = options;
+      bulk.dataset.options = options;
+      Array.from(bulk.options).forEach(option => { option.selected = selectedBulk.has(option.value); });
+    }
+  }
   renderCollectionManager();
   renderCollectionWarning();
 }
@@ -3653,6 +3782,7 @@ function refreshCollectionControls() {
 function renderCollectionManager() {
   const list = document.getElementById('collection-list');
   if (!list) return;
+  if (list.contains(document.activeElement)) return;
   list.innerHTML = (lastCollections || []).map(c => {
     const actions = c.id === 'all' ? '<span class="collection-meta">Built in</span>' :
       `<div class="collection-actions"><button type="button" class="btn btn-secondary btn-small" onclick="renameCollection('${escapeHtml(c.id)}')">Rename</button><button type="button" class="btn btn-secondary btn-small" style="color:var(--vermilion)" onclick="deleteCollection('${escapeHtml(c.id)}')">Delete</button></div>`;
@@ -3746,8 +3876,10 @@ async function deleteCollection(id) {
 function setCollectionFilter(id) {
   currentCollectionFilter = id || 'all';
   storeCollectionFilter(currentCollectionFilter);
+  imageGridVisibleCount = IMAGE_GRID_PAGE_SIZE;
+  document.getElementById('image-grid').dataset.signature = '';
   renderCollectionWarning();
-  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages);
+  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages, true);
 }
 
 function selectedImageNames() {
@@ -3799,16 +3931,31 @@ function pipelineChip(entry) {
   return ` <span class="next-badge" title="${escapeHtml(title)}">${escapeHtml(text)}</span>`;
 }
 
-function renderImageGrid(uploadFiles, serveData, nextImages) {
+function patentChip(entry) {
+  return entry && entry.patent
+    ? ' <span class="patent-badge" title="Structured patent record">Patent</span>'
+    : '';
+}
+
+function renderImageGrid(uploadFiles, serveData, nextImages, force = false) {
   lastUploadFiles = uploadFiles;
   lastServeData   = serveData;
   lastNextImages  = nextImages || {};
   const grid = document.getElementById('image-grid');
+  grid.setAttribute('aria-busy', 'false');
+  const signature = JSON.stringify([uploadFiles, serveData, nextImages, currentCollectionFilter, imageGridVisibleCount]);
+  if (!force && (grid.dataset.signature === signature || grid.contains(document.activeElement) || document.querySelector('.modal-backdrop.show'))) return;
+  const selected = new Set(selectedImageNames());
+  grid.dataset.signature = signature;
   grid.innerHTML = '';
-  uploadFiles.forEach(entry => {
+  const visibleEntries = uploadFiles.filter(entry => {
     // Failed images are shown only in the "Failed conversions" list, not the grid.
-    if (entry.status === 'failed') return;
-    if (currentCollectionFilter !== 'all' && !(entry.collection_ids || []).includes(currentCollectionFilter)) return;
+    if (entry.status === 'failed') return false;
+    if (currentCollectionFilter !== 'all' && !(entry.collection_ids || []).includes(currentCollectionFilter)) return false;
+    return true;
+  });
+  const entriesToRender = visibleEntries.slice(0, imageGridVisibleCount);
+  entriesToRender.forEach(entry => {
     const fname    = entry.name;
     const dithered = entry.dithered;
     const imgs = nextImages || {};
@@ -3824,20 +3971,19 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
     card.className = 'image-card' + (dithered ? '' : ' pending');
     const pendingBadge = dithered ? '' :
       '<div class="pending-badge" title="Dithered version for the e-ink display is still being generated">Dithering…</div>';
-    const thumbHtml = `<img src="/hokku/api/thumbnail/${encodeURIComponent(fname)}" alt="${escapeHtml(fname)}"
-         style="cursor:pointer" title="Click to view original">`;
+    const thumbHtml = `<a class="original-link" href="/hokku/api/original/${encodeURIComponent(fname)}" target="_blank" rel="noopener" aria-label="View original ${escapeHtml(fname)}"><img src="/hokku/api/thumbnail/${encodeURIComponent(fname)}" alt="${escapeHtml(fname)}" loading="lazy"></a>`;
     // Rotation action: orientation-aware "next" badges (non-interactive) when this
     // image is queued next for any orientation; otherwise an active "Show Next" button.
     const rotationHtml = !dithered ? '' : isNext
       ? nextLabels.map(l => `<span class="next-badge">${escapeHtml(l)}</span>`).join(' ')
       : '<button class="btn btn-secondary btn-small shownext-btn" data-name="">Show Next</button>';
     card.innerHTML = `
-      <input type="checkbox" class="image-select" data-name="" aria-label="Select ${escapeHtml(fname)}">
-      <button class="delete-btn" data-name="" title="Delete this image">&#x1F5D1;</button>
+      <label class="image-select-target"><input type="checkbox" class="image-select" data-name="" aria-label="Select ${escapeHtml(fname)}"></label>
+      <button class="delete-btn" data-name="" title="Delete this image" aria-label="Delete ${escapeHtml(fname)}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
       ${pendingBadge}
       ${thumbHtml}
       <div class="card-body">
-        <div class="filename">${escapeHtml(fname)}${pipelineChip(entry)}</div>
+        <div class="filename">${entry.patent ? `<span class="patent-card-name">${escapeHtml(entry.patent.simple_name || fname)}</span><span class="patent-card-file">${escapeHtml(fname)}</span>` : escapeHtml(fname)}${patentChip(entry)}${pipelineChip(entry)}</div>
         <div class="card-actions">
           ${rotationHtml}
           <button class="btn btn-secondary btn-small details-btn" data-name="">Details</button>
@@ -3845,8 +3991,6 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
       </div>
     `;
     // Wire click handlers via data attributes to avoid injection from filenames.
-    const img = card.querySelector('img');
-    img.addEventListener('click', () => window.open('/hokku/api/original/' + encodeURIComponent(fname)));
     const delBtn = card.querySelector('.delete-btn');
     delBtn.dataset.name = fname;
     delBtn.addEventListener('click', () => deleteImage(fname));
@@ -3860,10 +4004,41 @@ function renderImageGrid(uploadFiles, serveData, nextImages) {
     }
     const select = card.querySelector('.image-select');
     select.dataset.name = fname;
+    select.checked = selected.has(fname);
     select.addEventListener('change', updateSelectionActions);
     grid.appendChild(card);
   });
+  if (!visibleEntries.length) {
+    const empty = document.createElement('p');
+    empty.className = 'gallery-empty';
+    empty.textContent = currentCollectionFilter === 'all'
+      ? 'No photos yet. Choose photos below to start your library.'
+      : 'No photos in this collection. Add photos below or choose another collection.';
+    grid.appendChild(empty);
+  }
+  if (visibleEntries.length > entriesToRender.length) {
+    const pagination = document.createElement('div');
+    pagination.className = 'image-grid-pagination';
+    pagination.setAttribute('aria-live', 'polite');
+    const remaining = visibleEntries.length - entriesToRender.length;
+    pagination.innerHTML = `<span>Showing ${entriesToRender.length} of ${visibleEntries.length}</span><button type="button" class="btn btn-secondary" id="image-grid-more">See more photos <span aria-hidden="true">(${Math.min(IMAGE_GRID_PAGE_SIZE, remaining)})</span></button>`;
+    pagination.querySelector('button').addEventListener('click', showMoreImages);
+    grid.appendChild(pagination);
+  } else if (visibleEntries.length > IMAGE_GRID_PAGE_SIZE) {
+    const pagination = document.createElement('div');
+    pagination.className = 'image-grid-pagination';
+    pagination.setAttribute('aria-live', 'polite');
+    pagination.innerHTML = `<span>Showing all ${visibleEntries.length} photos</span>`;
+    grid.appendChild(pagination);
+  }
   updateSelectionActions();
+}
+
+function showMoreImages() {
+  imageGridVisibleCount += IMAGE_GRID_PAGE_SIZE;
+  renderImageGrid(lastUploadFiles, lastServeData, lastNextImages, true);
+  const more = document.getElementById('image-grid-more');
+  (more || document.querySelector('.image-grid .image-card:last-of-type .details-btn'))?.focus();
 }
 
 function renderImageCollectionEditor(fname, entry) {
@@ -3919,9 +4094,10 @@ async function saveImageCollections(fname, host) {
 function showImageDetails(fname) {
   const entry   = (lastUploadFiles || []).find(e => e.name === fname) || {};
   const sd      = (lastServeData   || {})[fname] || {};
+  const patent  = entry.patent || null;
 
   const modal   = document.getElementById('img-detail-modal');
-  document.getElementById('img-detail-title').textContent = fname;
+  document.getElementById('img-detail-title').textContent = patent ? (patent.simple_name || fname) : fname;
 
   const thumb   = document.getElementById('img-detail-thumb');
   const boxContainer = document.getElementById('img-detail-face-boxes');
@@ -3984,7 +4160,21 @@ function showImageDetails(fname) {
     }
   }
 
+  const patentRows = patent ? [
+    ['Invention', escapeHtml(patent.simple_name || '–')],
+    ['Inventor(s)', escapeHtml((patent.inventor_names || []).join(', ') || '–')],
+    ['Patent year', escapeHtml(fmt(patent.patent_year, '–'))],
+    ['Patent number', escapeHtml(patent.patent_number || '–')],
+    ['Description', escapeHtml(patent.description || '–')],
+    ['Category', escapeHtml(patent.category || '–')],
+    ['Verification', escapeHtml(patent.verification_status || '–')],
+    ['Recommended figure', escapeHtml(fmt(patent.recommended_figure, '–'))],
+    ['Recommended page', escapeHtml(fmt(patent.recommended_page, '–'))],
+    ['Iconicity score', escapeHtml(fmt(patent.iconicity_score, '–'))],
+    ['Visual quality', escapeHtml(fmt(patent.visual_quality_score, '–'))],
+  ] : [];
   const rows = [
+    ...patentRows,
     ['Dimensions', dimsCell],
     ['Orientation', orientStr],
     ['Dither time', ditherStr],
@@ -3999,7 +4189,15 @@ function showImageDetails(fname) {
     rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 
   const actions = document.getElementById('img-detail-actions');
-  if (entry.dithered) {
+  if (patent) {
+    const id = encodeURIComponent(patent.id || '');
+    const source = patent.source_url ? `<a class="btn btn-secondary btn-small" href="${escapeHtml(patent.source_url)}" target="_blank" rel="noopener">Open patent source</a>` : '';
+    actions.innerHTML = `${source}
+      <a class="btn btn-secondary btn-small" href="/hokku/api/patent/${id}/original" target="_blank">Original drawing</a>
+      <a class="btn btn-secondary btn-small" href="/hokku/api/patent/${id}/source.pdf" target="_blank">Source PDF</a>
+      <a class="btn btn-secondary btn-small" href="/hokku/api/patent/${id}/display" target="_blank">Preview e-ink render</a>
+      <button class="btn btn-secondary btn-small" type="button" onclick="rerenderPatent('${id}')">Re-render</button>`;
+  } else if (entry.dithered) {
     actions.innerHTML = `<a class="btn btn-secondary btn-small" href="/hokku/api/dithered/${encodeURIComponent(fname)}" target="_blank">View dithered</a>`;
   } else {
     actions.innerHTML = '<span style="color:#92400e;font-size:0.85em">Dithered version not ready yet</span>';
@@ -4023,6 +4221,18 @@ function showImageDetails(fname) {
   closeBtn.addEventListener('click', close);
   modal.addEventListener('click', onBackdrop);
   document.addEventListener('keydown', onKey);
+}
+
+async function rerenderPatent(encodedId) {
+  try {
+    const resp = await fetch('/hokku/api/patent/' + encodedId + '/render', {method: 'POST'});
+    const body = await resp.json();
+    if (!resp.ok) throw new Error(body.error || `HTTP ${resp.status}`);
+    showToast('Patent render refreshed.');
+    await refreshStatus();
+  } catch (e) {
+    showToast('Could not rerender patent: ' + e.message);
+  }
 }
 
 // ── Per-picture conversion override ───────────────────────────────
@@ -4366,8 +4576,13 @@ async function runImageCompareGrid() {
 //                     mid-typing.
 
 async function loadConfig() {
+  if (configLoadPending || configLoaded) return;
+  configLoadPending = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const resp = await fetch('/hokku/api/config');
+    const resp = await fetch('/hokku/api/config', {cache: 'no-store', signal: controller.signal});
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const cfg = data.config;
 
@@ -4489,9 +4704,13 @@ async function loadConfig() {
     if (installerRow) {
       installerRow.style.display = data.installer_available ? '' : 'none';
     }
+    configLoaded = true;
   } catch (e) {
     console.error('Config load failed:', e);
-    showToast('Failed to load configuration');
+  } finally {
+    configLoadPending = false;
+    clearTimeout(timeout);
+    updateConnectionState();
   }
 }
 
@@ -4517,8 +4736,13 @@ async function resetToInstaller() {
 }
 
 async function refreshStatus() {
+  if (statusRefreshPending) return;
+  statusRefreshPending = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const resp = await fetch('/hokku/api/status');
+    const resp = await fetch('/hokku/api/status', {cache: 'no-store', signal: controller.signal});
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
     document.getElementById('server-time').textContent = data.server_time || '';
@@ -4590,9 +4814,36 @@ async function refreshStatus() {
     renderImageGrid(uploadList, data.serve_data, data.next_images || {});
     renderFailedList(data.failed_files || []);
     updatePreviewImageOptions(uploadList);
+    lastStatusAt = new Date();
+    updateConnectionState();
   } catch (e) {
     console.error('Status refresh failed:', e);
+    updateConnectionState(true);
+    document.getElementById('image-grid').setAttribute('aria-busy', 'false');
+    if (!lastStatusAt) document.getElementById('image-grid').innerHTML = '<p class="gallery-empty">Photos will appear when the server reconnects.</p>';
+  } finally {
+    clearTimeout(timeout);
+    statusRefreshPending = false;
   }
+}
+
+function updateConnectionState(failed = false) {
+  const status = document.getElementById('connection-status');
+  const problem = failed || !navigator.onLine || (!configLoaded && !configLoadPending);
+  status.hidden = !problem && !!lastStatusAt;
+  status.dataset.state = problem ? 'error' : 'loading';
+  document.getElementById('connection-retry').hidden = !problem;
+  document.getElementById('connection-message').textContent = problem
+    ? (!navigator.onLine ? 'You are offline. Reconnect to use Hokku. No commands are queued.'
+      : (!configLoaded ? 'Configuration could not load. Try again before changing settings.'
+        : `Hokku is unreachable. Showing data from ${lastStatusAt?.toLocaleTimeString() || 'the last successful connection'}.`))
+    : 'Connecting to Hokku…';
+}
+
+async function retryConnection() {
+  const retry = document.getElementById('connection-retry');
+  retry.disabled = true;
+  try { await loadConfig(); await refreshStatus(); } finally { retry.disabled = false; }
 }
 
 function showDebugInfo() {
@@ -4611,6 +4862,7 @@ function showDebugInfo() {
 function showConfirm({title, message, okLabel, okClass}) {
   return new Promise(resolve => {
     const modal = document.getElementById('confirm-modal');
+    modal._returnFocus = document.activeElement;
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').textContent = message;
     const okBtn = document.getElementById('confirm-ok');
@@ -4634,14 +4886,14 @@ function showConfirm({title, message, okLabel, okClass}) {
     const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
     const onKey = (e) => {
       if (e.key === 'Escape') cleanup(false);
-      else if (e.key === 'Enter') cleanup(true);
+      // Native button activation handles Enter on the focused action.
     };
 
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
     modal.addEventListener('click', onBackdrop);
     document.addEventListener('keydown', onKey);
-    okBtn.focus();
+    cancelBtn.focus();
   });
 }
 
@@ -4835,7 +5087,10 @@ function onMdnsToggle() {
 
 // Initial load: fetch config once, then start polling volatile status only.
 loadConfig().then(refreshStatus);
-setInterval(refreshStatus, 5000);
+setInterval(() => { if (!document.hidden && navigator.onLine) refreshStatus(); }, 5000);
+window.addEventListener('online', retryConnection);
+window.addEventListener('offline', () => updateConnectionState(true));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) retryConnection(); });
 </script>
 </body>
 </html>

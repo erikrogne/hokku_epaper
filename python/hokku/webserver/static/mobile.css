@@ -1,0 +1,56 @@
+/* Phone ergonomics within Hokku's existing paper-and-ink design. */
+[hidden] { display: none !important; }
+body { min-height: 100dvh; padding-top: env(safe-area-inset-top); }
+main.page { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+.section-nav { position: sticky; top: 0; z-index: 30; background: var(--paper-card-solid); border-bottom: 1px solid var(--bamboo); }
+.section-nav .nav-inner { display: flex; max-width: 1280px; margin: auto; padding: 4px max(12px, env(safe-area-inset-left)); gap: 8px; }
+.section-nav a, .section-nav button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; font: inherit; font-weight: 600; color: var(--indigo); background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.section-nav a:hover, .section-nav button:hover { background: var(--bamboo-soft); text-decoration: none; }
+section, #sec-admin, #upload-zone { scroll-margin-top: 76px; }
+.skip-link { position: fixed; top: -100px; left: 12px; z-index: 4000; padding: 12px; background: var(--paper-card-solid); }
+.skip-link:focus { top: 12px; }
+:is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; }
+.btn, .btn-small, .icon-btn, .btn-icon-danger, .image-card .delete-btn { min-width: 44px; min-height: 44px; }
+.image-select-target { position: absolute; top: 8px; left: 8px; z-index: 4; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--paper-card-solid); border-radius: 6px; cursor: pointer; }
+.image-select { position: static; width: 22px; height: 22px; margin: 0; }
+.image-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+.image-card .original-link { display: block; }
+.image-card .original-link img { width: 100%; display: block; }
+.collection-toolbar select, .screen-collection-select, .bulk-image-actions select { min-height: 44px; max-width: 100%; }
+#screens-container { max-width: 100%; overflow-x: auto; }
+.upload-zone { width: 100%; font: inherit; color: var(--sumi); min-height: 88px; }
+.upload-zone span { display: block; }
+.admin-toggle { width: 100%; border: 0; background: transparent; text-align: left; color: var(--sumi); }
+.admin-toggle .admin-heading { font: 500 1.65rem var(--font-serif); }
+.connection-status, .pwa-message { padding: 12px 16px; margin: 16px 0; border: 1px solid var(--bamboo); background: var(--paper-card-solid); border-radius: 6px; overflow-wrap: anywhere; }
+.connection-status[data-state="error"] { border-color: var(--vermilion); }
+.connection-status p, .pwa-message p { margin-bottom: 8px; }
+.gallery-empty { grid-column: 1 / -1; padding: 24px 12px; color: var(--stone); }
+.modal-backdrop { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.modal, .img-detail-modal { min-width: 0; width: 100%; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+body.dialog-open { overflow: hidden; }
+.modal p, .modal td { overflow-wrap: anywhere; word-break: normal; }
+.modal .modal-actions { flex-wrap: wrap; }
+#toast { max-width: calc(100vw - 24px); bottom: calc(20px + env(safe-area-inset-bottom)); overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  main.page { padding: 16px max(12px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  #header-strip, #header-strip img { height: 88px; }
+  .section-nav .nav-inner { gap: 0; }
+  .section-nav a, .section-nav button { flex: 1; padding: 8px 4px; font-size: 16px; }
+  .section-card { padding: 16px 12px; }
+  .config-row { align-items: stretch; gap: 8px; }
+  .config-row label, .config-row .info { min-width: 0; width: 100%; }
+  :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]) { font-size: 16px; min-height: 44px; max-width: 100%; }
+  .config-row input[type="text"], .config-row input[type="password"], .config-row select { width: 100%; min-width: 0 !important; }
+  .collection-manager .config-row input { min-width: 0 !important; }
+  .collection-row .collection-actions { gap: 8px; }
+  .card-actions .btn { flex: 1; }
+  .stat { min-width: 0; overflow-wrap: anywhere; }
+  .screen-config-modal .config-row label:first-child { min-width: 0; }
+  .screen-config-modal .config-row > div { width: 100%; }
+  .modal { padding: 18px 14px; }
+  input[type="range"] { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

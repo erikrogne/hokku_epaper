@@ -1,0 +1,7 @@
+{
+  "baseline_errors": 56,
+  "current_errors": 55,
+  "introduced_diagnostics": 0,
+  "remaining": "Existing Iconic Patents modules and tests",
+  "comparison": "same local toolchain; diagnostic file, message and rule compared against preserved baseline 53381aa"
+}

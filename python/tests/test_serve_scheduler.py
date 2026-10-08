@@ -67,6 +67,30 @@ def test_collections_filter_rotation_without_resetting_global_stats(
     }
 
 
+def test_invalidate_collection_reconciles_new_ready_image(app_config: AppConfig, make_test_image):
+    """A newly converted collection image must be schedulable immediately."""
+    mgr, sched = _setup(app_config, make_test_image, ["existing.png"])
+    collection = sched.collection_store.create("Newspaper")
+    sched.collection_store.add_images(collection.id, ["existing.png"])
+    assert sched.pick_next(Orientation.NEUTRAL, collection.id) == "existing.png"
+
+    make_test_image(Path(app_config.upload_dir) / "newspaper.png")
+    mgr.sync()
+    assert [(r.name, r.convert_status) for r in mgr.list()] == [
+        ("existing.png", "ok"),
+        ("newspaper.png", "ok"),
+    ]
+    sched.collection_store.add_images(collection.id, ["newspaper.png"])
+    sched.invalidate_collection(collection.id)
+
+    stats = sched.stats_for("newspaper.png")
+    assert stats is not None
+    assert sched.peek_next(Orientation.NEUTRAL, collection.id) in {
+        "existing.png",
+        "newspaper.png",
+    }
+
+
 def test_collection_fair_rotation_only_counts_members(app_config: AppConfig, make_test_image):
     _mgr, sched = _setup(app_config, make_test_image, ["a.jpg", "b.jpg", "outside.jpg"])
     collection = sched.collection_store.create("Pair")
@@ -102,6 +126,49 @@ def test_active_collection_persists_per_screen(app_config: AppConfig, make_test_
     assert sched2.collection_store.get(collection.id).name == "Family"
     sched2.reset_active_collection(collection.id)
     assert sched2.get_screen_config("hallway").active_collection_id == ALL_COLLECTION_ID
+
+
+def test_display_name_persists_and_old_config_defaults_to_blank(
+    app_config: AppConfig, make_test_image
+):
+    mgr, sched = _setup(app_config, make_test_image, ["a.jpg"])
+    sched.set_screen_config("unnamed", ScreenConfig(display_name="Living Room"))
+
+    assert ServeScheduler(mgr).get_screen_config("unnamed").display_name == "Living Room"
+    assert ScreenConfig.from_dict({"orientation": "landscape"}).display_name == ""
+    assert (
+        ScreenConfig.from_dict(
+            {"orientation": "landscape", "screen_label": "Legacy label"}
+        ).display_name
+        == "Legacy label"
+    )
+
+
+def test_device_name_persists_and_old_config_defaults_to_blank(
+    app_config: AppConfig, make_test_image
+):
+    mgr, sched = _setup(app_config, make_test_image, ["a.jpg"])
+    sched.set_screen_config("unnamed", ScreenConfig(device_name="huessen-hallway"))
+
+    assert ServeScheduler(mgr).get_screen_config("unnamed").device_name == "huessen-hallway"
+    assert ScreenConfig.from_dict({"orientation": "landscape"}).device_name == ""
+
+
+def test_screen_config_resolves_by_mac_after_rename(app_config: AppConfig):
+    mgr = SingleThreadedImageManager(app_config)
+    sched = ServeScheduler(mgr)
+    mac = "de:ad:be:ef:00:10"
+    config = ScreenConfig(
+        orientation=Orientation.PORTRAIT,
+        active_collection_id="family",
+        display_name="Hallway",
+        device_name="hallway-frame",
+    )
+
+    sched.record_screen_call("old-name", "1.1.1.1", 300, None, None, None, mac=mac)
+    sched.set_screen_config("old-name", config)
+
+    assert sched.get_screen_config("new-name", mac=mac) == config
 
 
 def test_pick_next_single(app_config: AppConfig, make_test_image):
@@ -390,7 +457,11 @@ def test_set_screen_config_preserves_all_fields(app_config: AppConfig):
     mgr = SingleThreadedImageManager(app_config)
     sched = ServeScheduler(mgr)
 
-    cfg1 = ScreenConfig(orientation=Orientation.LANDSCAPE, filter_by_orientation=True)
+    cfg1 = ScreenConfig(
+        orientation=Orientation.LANDSCAPE,
+        filter_by_orientation=True,
+        display_name="Kitchen",
+    )
     sched.set_screen_config("s1", cfg1)
 
     # Update only orientation — filter_by_orientation must survive
@@ -399,6 +470,7 @@ def test_set_screen_config_preserves_all_fields(app_config: AppConfig):
     updated = sched.get_screen_config("s1")
     assert updated.orientation == Orientation.PORTRAIT
     assert updated.filter_by_orientation is True
+    assert updated.display_name == "Kitchen"
 
 
 def test_unknown_screen_defaults_to_landscape(app_config: AppConfig):
@@ -407,6 +479,7 @@ def test_unknown_screen_defaults_to_landscape(app_config: AppConfig):
     sched = ServeScheduler(mgr)
     cfg = sched.get_screen_config("never-seen")
     assert cfg.orientation == Orientation.LANDSCAPE
+    assert cfg.orientation_override is False
     assert cfg.filter_by_orientation is False
 
 
